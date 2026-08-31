@@ -1,8 +1,9 @@
 --[[
-    EXTREMER TEST: 10 STUDS DESYNC
+    EXTREMER TEST: 50 STUDS DESYNC
     - Resetet den Character 1x
-    - Zeigt grünen Marker an Fake Position
-    - Desync mit 10 Studs (sehr sichtbar)
+    - Zeigt grünen Marker an Fake Position (50 Studs entfernt)
+    - Desync mit 50 Studs (extrem sichtbar)
+    - WARNUNG: FAST GARANTIERTER BANN!
 ]]
 
 local Players = game:GetService("Players")
@@ -13,7 +14,7 @@ local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
-print("🔥 EXTREMER TEST STARTET...")
+print("🔥 EXTREMER TEST - 50 STUDS STARTET...")
 
 -- ==============================
 -- RESET 1x
@@ -26,33 +27,48 @@ rootPart = character:WaitForChild("HumanoidRootPart")
 print("✅ Respawned!")
 
 -- ==============================
--- FAKE POSITION (10 STUDS)
+-- FAKE POSITION (50 STUDS)
 -- ==============================
-local fakePos = rootPart.Position + Vector3.new(10, 0, 10)
+local fakePos = rootPart.Position + Vector3.new(50, 5, 50)
 
 -- ==============================
--- GRÜNER MARKER
+-- GRÜNER MARKER (GROSS)
 -- ==============================
 local marker = Instance.new("Part")
-marker.Size = Vector3.new(8, 1, 8)
+marker.Size = Vector3.new(10, 2, 10)
 marker.Position = fakePos
 marker.Anchored = true
 marker.CanCollide = false
 marker.BrickColor = BrickColor.new("Bright green")
 marker.Material = Enum.Material.Neon
-marker.Transparency = 0.2
+marker.Transparency = 0.1
 marker.Parent = Workspace
+
+-- Text anzeigen
+local billboard = Instance.new("BillboardGui")
+billboard.Size = UDim2.new(0, 300, 0, 50)
+billboard.StudsOffset = Vector3.new(0, 5, 0)
+billboard.Parent = marker
+
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(1, 0, 1, 0)
+label.BackgroundTransparency = 1
+label.Text = "🎯 50 STUDS FAKE POSITION"
+label.TextColor3 = Color3.fromRGB(0, 255, 0)
+label.TextScaled = true
+label.Font = Enum.Font.Bold
+label.Parent = billboard
 
 local glow = Instance.new("PointLight")
 glow.Parent = marker
 glow.Color = Color3.fromRGB(0, 255, 0)
-glow.Range = 20
-glow.Brightness = 5
+glow.Range = 30
+glow.Brightness = 10
 
 print("🟢 Marker an FAKE Position: " .. tostring(fakePos))
 
 -- ==============================
--- DESYNC (10 STUDS)
+-- DESYNC (50 STUDS)
 -- ==============================
 local offset = Vector3.new(0, 0, 0)
 
@@ -60,14 +76,16 @@ RunService.Heartbeat:Connect(function()
     if not rootPart or not rootPart.Parent then return end
     
     local target = Vector3.new(
+        math.random(-5000, 5000) / 100,  -- 50 Studs
         math.random(-1000, 1000) / 100,
-        math.random(-200, 200) / 100,
-        math.random(-1000, 1000) / 100
+        math.random(-5000, 5000) / 100
     )
     
-    offset = offset:Lerp(target, 0.1)
+    offset = offset:Lerp(target, 0.05)
     rootPart.CFrame = rootPart.CFrame + offset
 end)
 
-print("🔥 10 STUDS DESYNC LÄUFT!")
-print("📌 Andere sollten dich 10 Studs versetzt sehen!")
+print("💀 50 STUDS DESYNC LÄUFT!")
+print("📌 Andere sollten dich 50 Studs versetzt sehen!")
+print("⚠️ EXTREM RISKANT - NUR AUF WEGWERF-ACCOUNTS!")
+print("⚠️ FAST GARANTIERTER BANN!")
