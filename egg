@@ -1,79 +1,33 @@
 --[[
-    Script Name: 🥚 REAL EGG SPAWNER - Working Edition
+    Script Name: 🥚 EGG SPAWNER
     Type: LocalScript
-    Compatible With: Delta Executor
-    Description: Spawns REAL tradeable eggs directly into your inventory
+    Description: Spawns eggs directly into your inventory
 ]]
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerStorage = game:GetService("ServerStorage")
 local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 
--- ========== CONFIGURATION ==========
-local Config = {
-    EggRarity = "Godly",
-    SpawnAmount = 1,
-    ToggleKey = "R",
+-- ========== EGG NAMES ==========
+local EggNames = {
+    "Egg",
+    "GoldenEgg",
+    "DragonEgg",
+    "PhoenixEgg",
+    "UnicornEgg",
+    "MythicalEgg",
+    "GodlyEgg",
+    "RainbowEgg",
+    "DarkEgg",
+    "CrystalEgg",
+    "DivineEgg",
+    "CosmicEgg",
+    "CelestialEgg",
+    "LegendaryEgg",
+    "AncientEgg",
 }
-
--- ========== REAL EGG DATA ==========
-local EggData = {
-    ["Godly"] = {
-        Name = "Godly Egg",
-        Rarity = "Godly",
-        Value = 10000,
-        Color = Color3.fromRGB(255, 215, 0),
-        ID = "godly_egg",
-    },
-    ["Legendary"] = {
-        Name = "Legendary Egg",
-        Rarity = "Legendary",
-        Value = 5000,
-        Color = Color3.fromRGB(255, 100, 0),
-        ID = "legendary_egg",
-    },
-    ["Mythical"] = {
-        Name = "Mythical Egg",
-        Rarity = "Mythical",
-        Value = 2500,
-        Color = Color3.fromRGB(255, 0, 255),
-        ID = "mythical_egg",
-    },
-    ["Rainbow"] = {
-        Name = "Rainbow Egg",
-        Rarity = "Rainbow",
-        Value = 1500,
-        Color = Color3.fromRGB(0, 255, 255),
-        ID = "rainbow_egg",
-    },
-    ["Celestial"] = {
-        Name = "Celestial Egg",
-        Rarity = "Celestial",
-        Value = 20000,
-        Color = Color3.fromRGB(255, 50, 200),
-        ID = "celestial_egg",
-    },
-}
-
--- ========== FIND REMOTES ==========
-local function FindRemotes()
-    local remotes = {}
-    local services = {ReplicatedStorage, Workspace, game:GetService("Lighting"), game:GetService("ServerScriptService"), LocalPlayer}
-    for _, service in ipairs(services) do
-        pcall(function()
-            for _, child in ipairs(service:GetDescendants()) do
-                if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
-                    table.insert(remotes, child)
-                end
-            end
-        end)
-    end
-    return remotes
-end
 
 -- ========== FIND INVENTORY ==========
 local function FindInventory()
@@ -82,492 +36,182 @@ local function FindInventory()
         LocalPlayer:FindFirstChild("Inventory"),
         LocalPlayer:FindFirstChild("StarterGear"),
         LocalPlayer:FindFirstChild("Items"),
-        LocalPlayer:FindFirstChild("Collection"),
         workspace:FindFirstChild("Inventory"),
     }
     for _, loc in ipairs(locations) do
         if loc then return loc end
     end
-    if LocalPlayer:IsA("Model") then return LocalPlayer end
-    local folder = Instance.new("Folder")
-    folder.Name = "Inventory"
-    folder.Parent = LocalPlayer
-    return folder
+    return LocalPlayer
 end
 
 -- ========== SPAWN EGG ==========
 local function SpawnEgg()
-    local eggData = EggData[Config.EggRarity] or EggData["Godly"]
+    local eggName = EggNames[math.random(1, #EggNames)]
+    print("🥚 Spawning: " .. eggName)
+    
     local success = false
     
-    print("🥚 Attempting to spawn: " .. eggData.Name)
-    
-    -- METHOD 1: Fire remote events
-    local remotes = FindRemotes()
-    local remoteKeywords = {"Give", "Add", "Spawn", "Get", "Collect", "Claim", "Egg", "Item", "Inventory", "Gift"}
+    -- METHOD 1: Try remote events
+    local remotes = {}
+    for _, child in ipairs(ReplicatedStorage:GetChildren()) do
+        if child:IsA("RemoteEvent") then
+            table.insert(remotes, child)
+        end
+    end
     
     for _, remote in ipairs(remotes) do
         local name = (remote.Name or ""):lower()
-        local shouldTry = false
-        for _, keyword in ipairs(remoteKeywords) do
-            if name:find(keyword:lower()) then shouldTry = true break end
-        end
-        
-        if shouldTry and remote:IsA("RemoteEvent") then
-            local patterns = {
-                {eggData.ID, 1},
-                {eggData.ID, LocalPlayer, 1},
-                {eggData.Name, 1},
-                {eggData.Name, LocalPlayer, 1},
-                {eggData.ID, 1, "Inventory"},
-                {eggData.ID, LocalPlayer, "Backpack"},
-                {eggData.Name, 1, "Backpack"},
-                {tonumber(eggData.ID) or 1, 1},
-                {eggData},
-                {eggData.ID, 1, LocalPlayer},
-                {"Egg", eggData.ID, 1},
-                {LocalPlayer, eggData.ID, 1},
-                {eggData.Name, eggData.Rarity, 1},
-                {eggData.ID, eggData.Value},
-                {eggData.Name, eggData.Value},
-            }
-            
-            for _, args in ipairs(patterns) do
-                pcall(function()
-                    remote:FireServer(unpack(args))
-                    success = true
-                    print("✅ Fired remote: " .. remote.Name)
-                end)
-                if success then break end
-            end
+        if name:find("give") or name:find("add") or name:find("spawn") or name:find("egg") then
+            pcall(function()
+                remote:FireServer(eggName, 1)
+                remote:FireServer(eggName, LocalPlayer, 1)
+                remote:FireServer({Name = eggName, Amount = 1})
+                remote:FireServer(eggName, "Backpack")
+                success = true
+                print("✅ Spawned via remote: " .. remote.Name)
+            end)
             if success then break end
         end
     end
     
     -- METHOD 2: Clone existing egg
     if not success then
-        local eggTemplates = {}
-        local searchLocations = {ReplicatedStorage, ServerStorage, Workspace, game:GetService("Lighting")}
-        for _, loc in ipairs(searchLocations) do
-            pcall(function()
-                for _, child in ipairs(loc:GetDescendants()) do
-                    if child:IsA("Tool") or child:IsA("Model") then
-                        local name = (child.Name or ""):lower()
-                        local eggKeywords = {"egg", "godly", "legendary", "mythical", "rainbow", "celestial"}
-                        for _, keyword in ipairs(eggKeywords) do
-                            if name:find(keyword) then
-                                table.insert(eggTemplates, child)
-                                break
-                            end
-                        end
-                    end
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("Tool") or obj:IsA("Model") then
+                local name = (obj.Name or ""):lower()
+                if name:find("egg") then
+                    local clone = obj:Clone()
+                    clone.Parent = FindInventory()
+                    print("✅ Cloned: " .. clone.Name)
+                    success = true
+                    break
                 end
-            end)
-        end
-        
-        if #eggTemplates > 0 then
-            local template = eggTemplates[math.random(1, #eggTemplates)]
-            local newEgg = template:Clone()
-            newEgg.Name = eggData.Name
-            newEgg.Parent = FindInventory()
-            success = true
-            print("✅ Cloned egg: " .. newEgg.Name)
+            end
         end
     end
     
-    -- METHOD 3: Create new egg
+    -- METHOD 3: Create new egg tool
     if not success then
         local tool = Instance.new("Tool")
-        tool.Name = eggData.Name
+        tool.Name = eggName
         tool.RequiresHandle = false
         
         local handle = Instance.new("Part")
         handle.Name = "Handle"
         handle.Size = Vector3.new(2, 3, 2)
         handle.Shape = Enum.PartType.Ball
-        handle.Color = eggData.Color
+        handle.Color = Color3.fromRGB(255, 215, 0)
         handle.Material = Enum.Material.Neon
-        handle.Transparency = 0.1
         handle.Anchored = false
         handle.CanCollide = false
         handle.Parent = tool
         
-        local light = Instance.new("PointLight")
-        light.Color = eggData.Color
-        light.Brightness = 3
-        light.Range = 15
-        light.Parent = handle
-        
-        local value = Instance.new("IntValue")
-        value.Name = "Value"
-        value.Value = eggData.Value
-        value.Parent = tool
-        
-        local rarity = Instance.new("StringValue")
-        rarity.Name = "Rarity"
-        rarity.Value = eggData.Rarity
-        rarity.Parent = tool
-        
-        local id = Instance.new("StringValue")
-        id.Name = "EggID"
-        id.Value = eggData.ID
-        id.Parent = tool
-        
         tool.Parent = FindInventory()
+        print("✅ Created: " .. tool.Name)
         success = true
-        print("✅ Created tool: " .. tool.Name)
     end
     
-    -- METHOD 4: Try common remote names
-    if not success then
-        local commonNames = {"GiveItem", "AddItem", "SpawnItem", "GetItem", "CollectItem", "ClaimItem", "GiveEgg", "SpawnEgg", "CollectEgg", "ClaimEgg", "AddEgg", "GetEgg"}
-        for _, name in ipairs(commonNames) do
-            local remote = ReplicatedStorage:FindFirstChild(name)
-            if remote and remote:IsA("RemoteEvent") then
-                pcall(function()
-                    remote:FireServer(eggData.ID, 1)
-                    success = true
-                    print("✅ Spawned via " .. name)
-                end)
-                if success then break end
-            end
-        end
-    end
-    
-    -- METHOD 5: Fire any remote with "egg" in name
-    if not success then
-        for _, remote in ipairs(remotes) do
-            local name = (remote.Name or ""):lower()
-            if name:find("egg") and remote:IsA("RemoteEvent") then
-                pcall(function()
-                    remote:FireServer(eggData.ID, 1, LocalPlayer)
-                    success = true
-                    print("✅ Spawned via " .. remote.Name)
-                end)
-                if success then break end
-            end
-        end
-    end
-    
-    if success then
-        print("✅ " .. eggData.Name .. " spawned successfully!")
-        return true
-    else
-        print("❌ Could not spawn " .. eggData.Name)
-        return false
-    end
-end
-
--- ========== CHECK INVENTORY ==========
-local function CheckInventory()
-    local inventory = FindInventory()
-    if not inventory then
-        print("❌ Could not find inventory")
-        return {}
-    end
-    
-    local eggs = {}
-    for _, child in ipairs(inventory:GetChildren()) do
-        local name = (child.Name or ""):lower()
-        if name:find("egg") then
-            table.insert(eggs, child.Name)
-        end
-    end
-    
-    if #eggs > 0 then
-        print("📋 Eggs in inventory:")
-        for _, egg in ipairs(eggs) do
-            print("  🥚 " .. egg)
-        end
-    else
-        print("📋 No eggs found in inventory")
-    end
-    
-    return eggs
+    return success
 end
 
 -- ========== GUI ==========
 local function CreateMenu()
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "EggSpawner"
-    screenGui.ResetOnSpawn = false
     screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 380, 0, 320)
-    mainFrame.Position = UDim2.new(0.5, -190, 0.5, -160)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
-    mainFrame.BackgroundTransparency = 0.1
-    mainFrame.BorderSizePixel = 0
-    mainFrame.Active = true
-    mainFrame.Draggable = true
-    mainFrame.Parent = screenGui
-
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 220, 0, 120)
+    frame.Position = UDim2.new(0.5, -110, 0.5, -60)
+    frame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+    frame.BackgroundTransparency = 0.15
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.Draggable = true
+    frame.Parent = screenGui
+    
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 15)
-    corner.Parent = mainFrame
-
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = frame
+    
     -- Title
     local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, 50)
+    title.Size = UDim2.new(1, 0, 0, 35)
     title.Position = UDim2.new(0, 0, 0, 0)
     title.BackgroundColor3 = Color3.fromRGB(255, 180, 50)
     title.BackgroundTransparency = 0.3
-    title.Text = "🥚 REAL EGG SPAWNER"
+    title.Text = "🥚 EGG SPAWNER"
     title.TextColor3 = Color3.fromRGB(255, 255, 255)
     title.TextScaled = true
     title.Font = Enum.Font.GothamBold
-    title.Parent = mainFrame
-
+    title.Parent = frame
+    
     -- Status
-    local statusLabel = Instance.new("TextLabel")
-    statusLabel.Size = UDim2.new(1, 0, 0, 25)
-    statusLabel.Position = UDim2.new(0, 0, 0, 55)
-    statusLabel.BackgroundTransparency = 1
-    statusLabel.Text = "🟢 Ready - Click SPAWN"
-    statusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
-    statusLabel.TextScaled = true
-    statusLabel.Font = Enum.Font.GothamBold
-    statusLabel.Parent = mainFrame
-
-    -- Egg Type
-    local typeLabel = Instance.new("TextLabel")
-    typeLabel.Size = UDim2.new(0.4, 0, 0, 30)
-    typeLabel.Position = UDim2.new(0.05, 0, 0, 95)
-    typeLabel.BackgroundTransparency = 1
-    typeLabel.Text = "🎯 Type:"
-    typeLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    typeLabel.TextScaled = true
-    typeLabel.Font = Enum.Font.GothamMedium
-    typeLabel.TextXAlignment = Enum.TextXAlignment.Left
-    typeLabel.Parent = mainFrame
-
-    local typeDropdown = Instance.new("TextButton")
-    typeDropdown.Size = UDim2.new(0.5, 0, 0, 30)
-    typeDropdown.Position = UDim2.new(0.45, 0, 0, 95)
-    typeDropdown.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    typeDropdown.Text = Config.EggRarity
-    typeDropdown.TextColor3 = Color3.fromRGB(255, 215, 0)
-    typeDropdown.TextScaled = true
-    typeDropdown.Font = Enum.Font.GothamBold
-    typeDropdown.BorderSizePixel = 0
-    typeDropdown.Parent = mainFrame
-
-    local typeCorner = Instance.new("UICorner")
-    typeCorner.CornerRadius = UDim.new(0, 8)
-    typeCorner.Parent = typeDropdown
-
-    -- Amount
-    local amountLabel = Instance.new("TextLabel")
-    amountLabel.Size = UDim2.new(0.4, 0, 0, 30)
-    amountLabel.Position = UDim2.new(0.05, 0, 0, 140)
-    amountLabel.BackgroundTransparency = 1
-    amountLabel.Text = "🔢 Amount:"
-    amountLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    amountLabel.TextScaled = true
-    amountLabel.Font = Enum.Font.GothamMedium
-    amountLabel.TextXAlignment = Enum.TextXAlignment.Left
-    amountLabel.Parent = mainFrame
-
-    local amountDropdown = Instance.new("TextButton")
-    amountDropdown.Size = UDim2.new(0.5, 0, 0, 30)
-    amountDropdown.Position = UDim2.new(0.45, 0, 0, 140)
-    amountDropdown.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    amountDropdown.Text = tostring(Config.SpawnAmount)
-    amountDropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
-    amountDropdown.TextScaled = true
-    amountDropdown.Font = Enum.Font.GothamBold
-    amountDropdown.BorderSizePixel = 0
-    amountDropdown.Parent = mainFrame
-
-    local amountCorner = Instance.new("UICorner")
-    amountCorner.CornerRadius = UDim.new(0, 8)
-    amountCorner.Parent = amountDropdown
-
+    local status = Instance.new("TextLabel")
+    status.Size = UDim2.new(1, 0, 0, 20)
+    status.Position = UDim2.new(0, 0, 0, 38)
+    status.BackgroundTransparency = 1
+    status.Text = "🟢 Ready"
+    status.TextColor3 = Color3.fromRGB(0, 255, 100)
+    status.TextScaled = true
+    status.Font = Enum.Font.GothamBold
+    status.Parent = frame
+    
     -- Spawn Button
-    local spawnButton = Instance.new("TextButton")
-    spawnButton.Size = UDim2.new(0.8, 0, 0, 50)
-    spawnButton.Position = UDim2.new(0.1, 0, 0, 190)
-    spawnButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-    spawnButton.Text = "🌟 SPAWN EGG"
-    spawnButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    spawnButton.TextScaled = true
-    spawnButton.Font = Enum.Font.GothamBold
-    spawnButton.BorderSizePixel = 0
-    spawnButton.Parent = mainFrame
-
-    local spawnCorner = Instance.new("UICorner")
-    spawnCorner.CornerRadius = UDim.new(0, 12)
-    spawnCorner.Parent = spawnButton
-
-    -- Check Button
-    local checkButton = Instance.new("TextButton")
-    checkButton.Size = UDim2.new(0.38, 0, 0, 35)
-    checkButton.Position = UDim2.new(0.06, 0, 0, 255)
-    checkButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-    checkButton.Text = "📋 Check"
-    checkButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    checkButton.TextScaled = true
-    checkButton.Font = Enum.Font.GothamBold
-    checkButton.BorderSizePixel = 0
-    checkButton.Parent = mainFrame
-
-    local checkCorner = Instance.new("UICorner")
-    checkCorner.CornerRadius = UDim.new(0, 8)
-    checkCorner.Parent = checkButton
-
-    -- Close Button
-    local closeButton = Instance.new("TextButton")
-    closeButton.Size = UDim2.new(0, 30, 0, 30)
-    closeButton.Position = UDim2.new(1, -40, 0, 10)
-    closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    closeButton.Text = "✕"
-    closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    closeButton.TextScaled = true
-    closeButton.Font = Enum.Font.GothamBold
-    closeButton.BorderSizePixel = 0
-    closeButton.Parent = mainFrame
-
+    local spawnBtn = Instance.new("TextButton")
+    spawnBtn.Size = UDim2.new(0.8, 0, 0, 35)
+    spawnBtn.Position = UDim2.new(0.1, 0, 0, 62)
+    spawnBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    spawnBtn.Text = "🌟 SPAWN"
+    spawnBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    spawnBtn.TextScaled = true
+    spawnBtn.Font = Enum.Font.GothamBold
+    spawnBtn.BorderSizePixel = 0
+    spawnBtn.Parent = frame
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 10)
+    btnCorner.Parent = spawnBtn
+    
+    -- Close
+    local close = Instance.new("TextButton")
+    close.Size = UDim2.new(0, 22, 0, 22)
+    close.Position = UDim2.new(1, -30, 0, 6)
+    close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    close.Text = "✕"
+    close.TextColor3 = Color3.fromRGB(255, 255, 255)
+    close.TextScaled = true
+    close.Font = Enum.Font.GothamBold
+    close.BorderSizePixel = 0
+    close.Parent = frame
+    
     local closeCorner = Instance.new("UICorner")
     closeCorner.CornerRadius = UDim.new(0, 8)
-    closeCorner.Parent = closeButton
-
-    -- ========== DROPDOWNS ==========
-    local typeOpen = false
-    local typeFrame = nil
+    closeCorner.Parent = close
     
-    typeDropdown.MouseButton1Click:Connect(function()
-        typeOpen = not typeOpen
-        if typeOpen then
-            local options = {"Godly", "Legendary", "Mythical", "Rainbow", "Celestial"}
-            typeFrame = Instance.new("Frame")
-            typeFrame.Size = UDim2.new(0.5, 0, 0, #options * 30)
-            typeFrame.Position = UDim2.new(0.45, 0, 0, 125)
-            typeFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-            typeFrame.BackgroundTransparency = 0.1
-            typeFrame.BorderSizePixel = 0
-            typeFrame.Parent = mainFrame
-            
-            local yPos = 0
-            for _, option in ipairs(options) do
-                local optionBtn = Instance.new("TextButton")
-                optionBtn.Size = UDim2.new(1, 0, 0, 30)
-                optionBtn.Position = UDim2.new(0, 0, 0, yPos)
-                optionBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-                optionBtn.BackgroundTransparency = 0.1
-                optionBtn.Text = option
-                optionBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-                optionBtn.TextScaled = true
-                optionBtn.Font = Enum.Font.GothamMedium
-                optionBtn.BorderSizePixel = 0
-                optionBtn.Parent = typeFrame
-                
-                optionBtn.MouseButton1Click:Connect(function()
-                    Config.EggRarity = option
-                    typeDropdown.Text = option
-                    typeFrame:Destroy()
-                    typeOpen = false
-                end)
-                yPos = yPos + 30
-            end
-        else
-            if typeFrame then
-                typeFrame:Destroy()
-                typeFrame = nil
-            end
-        end
+    spawnBtn.MouseButton1Click:Connect(function()
+        status.Text = "⏳ Spawning..."
+        status.TextColor3 = Color3.fromRGB(255, 200, 0)
+        SpawnEgg()
+        status.Text = "🟢 Ready"
+        status.TextColor3 = Color3.fromRGB(0, 255, 100)
     end)
-
-    local amountOpen = false
-    local amountFrame = nil
     
-    amountDropdown.MouseButton1Click:Connect(function()
-        amountOpen = not amountOpen
-        if amountOpen then
-            local options = {"1", "2", "3", "5", "10", "25", "50", "100"}
-            amountFrame = Instance.new("Frame")
-            amountFrame.Size = UDim2.new(0.5, 0, 0, #options * 30)
-            amountFrame.Position = UDim2.new(0.45, 0, 0, 170)
-            amountFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-            amountFrame.BackgroundTransparency = 0.1
-            amountFrame.BorderSizePixel = 0
-            amountFrame.Parent = mainFrame
-            
-            local yPos = 0
-            for _, option in ipairs(options) do
-                local optionBtn = Instance.new("TextButton")
-                optionBtn.Size = UDim2.new(1, 0, 0, 30)
-                optionBtn.Position = UDim2.new(0, 0, 0, yPos)
-                optionBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-                optionBtn.BackgroundTransparency = 0.1
-                optionBtn.Text = option
-                optionBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-                optionBtn.TextScaled = true
-                optionBtn.Font = Enum.Font.GothamMedium
-                optionBtn.BorderSizePixel = 0
-                optionBtn.Parent = amountFrame
-                
-                optionBtn.MouseButton1Click:Connect(function()
-                    Config.SpawnAmount = tonumber(option) or 1
-                    amountDropdown.Text = option
-                    amountFrame:Destroy()
-                    amountOpen = false
-                end)
-                yPos = yPos + 30
-            end
-        else
-            if amountFrame then
-                amountFrame:Destroy()
-                amountFrame = nil
-            end
-        end
-    end)
-
-    -- ========== BUTTONS ==========
-    spawnButton.MouseButton1Click:Connect(function()
-        statusLabel.Text = "⏳ Spawning..."
-        statusLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
-        
-        local spawned = 0
-        for i = 1, Config.SpawnAmount do
-            if SpawnEgg() then
-                spawned = spawned + 1
-            end
-            task.wait(0.2)
-        end
-        
-        statusLabel.Text = "✅ Spawned " .. spawned .. " eggs!"
-        statusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
-        
-        task.wait(3)
-        statusLabel.Text = "🟢 Ready - Click SPAWN"
-        statusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
-    end)
-
-    checkButton.MouseButton1Click:Connect(function()
-        CheckInventory()
-    end)
-
-    closeButton.MouseButton1Click:Connect(function()
+    close.MouseButton1Click:Connect(function()
         screenGui:Destroy()
     end)
-
-    -- Keybind
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        if input.KeyCode == Enum.KeyCode[Config.ToggleKey] then
-            mainFrame.Visible = not mainFrame.Visible
+    
+    UserInputService.InputBegan:Connect(function(input, processed)
+        if processed then return end
+        if input.KeyCode == Enum.KeyCode.R then
+            frame.Visible = not frame.Visible
         end
     end)
-
-    return screenGui
 end
 
--- ========== INIT ==========
+-- ========== LOAD ==========
 task.wait(0.5)
-local gui = CreateMenu()
-
-print("🥚 REAL EGG SPAWNER LOADED!")
+CreateMenu()
+print("🥚 EGG SPAWNER LOADED!")
 print("📌 Press 'R' to toggle menu")
-print("💡 Click 'SPAWN EGG' to spawn tradeable eggs!")
-print("📋 Click 'Check' to see your inventory")
+print("🌟 Click 'SPAWN' to spawn an egg into your inventory")
