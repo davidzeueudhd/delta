@@ -1,8 +1,9 @@
 --[[
-    ULTIMATIVE TEST: Character wird für andere sichtbar teleportiert
-    - Dein Character wird für andere an eine andere Position gesetzt
-    - Du siehst dich selbst normal
-    - Andere sehen dich an der FAKE Position
+    EXTREMER DESYNC - HARTE TELEPORTATION
+    - Kein Gleiten, keine Sanftheit
+    - Direkte Positionsänderung
+    - 1000 Studs Versatz
+    - WARNUNG: 100% BANN!
 ]]
 
 local Players = game:GetService("Players")
@@ -13,7 +14,7 @@ local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
-print("🔥 ULTIMATIVE TEST STARTET...")
+print("🔥 EXTREMER DESYNC STARTET...")
 
 -- ==============================
 -- RESET 1x
@@ -56,8 +57,8 @@ local function createMarker(position, text)
     local glow = Instance.new("PointLight")
     glow.Parent = marker
     glow.Color = Color3.fromRGB(0, 255, 0)
-    glow.Range = 15
-    glow.Brightness = 5
+    glow.Range = 20
+    glow.Brightness = 10
     
     game:GetService("Debris"):AddItem(marker, 30)
     print("🟢 Marker gesetzt an: " .. tostring(position))
@@ -65,35 +66,34 @@ local function createMarker(position, text)
 end
 
 -- ==============================
--- FAKE POSITION (100 STUDS ENTFERNT)
+-- FAKE POSITION (1000 STUDS)
 -- ==============================
-local fakePos = rootPart.Position + Vector3.new(100, 10, 100)
+local fakePos = rootPart.Position + Vector3.new(1000, 50, 1000)
 
 -- ==============================
 -- MARKER AN FAKE POSITION
 -- ==============================
-createMarker(fakePos, "🎯 ANDERE SEHEN DICH HIER")
+createMarker(fakePos, "🎯 ANDERE SEHEN DICH HIER (1000 STUDS)")
 print("🟢 Marker an Fake Position: " .. tostring(fakePos))
 
 -- ==============================
--- DESYNC (100 STUDS - HART)
+-- EXTREMER DESYNC (HART)
 -- ==============================
-local offset = Vector3.new(0, 0, 0)
-
 RunService.Heartbeat:Connect(function()
     if not rootPart or not rootPart.Parent then return end
     
-    -- HARTER DESYNC: Direkte Teleportation zur Fake Position
-    local target = Vector3.new(
-        math.random(-10000, 10000) / 100,  -- 100 Studs
-        math.random(-1000, 1000) / 100,
-        math.random(-10000, 10000) / 100
+    -- DIREKTE Positionsänderung – KEIN Gleiten!
+    local offset = Vector3.new(
+        math.random(-100000, 100000) / 100,  -- 1000 Studs
+        math.random(-5000, 5000) / 100,
+        math.random(-100000, 100000) / 100
     )
     
-    offset = offset:Lerp(target, 0.3)  -- Schnelleres Gleiten
+    -- Harte Teleportation
     rootPart.CFrame = rootPart.CFrame + offset
 end)
 
-print("🔥 100 STUDS DESYNC LÄUFT!")
-print("📌 Andere sehen dich an der FAKE POSITION!")
-print("📌 Du siehst dich selbst normal!")
+print("💀 EXTREMER DESYNC LÄUFT!")
+print("📌 Andere sehen dich 1000 Studs entfernt!")
+print("📌 KEIN Gleiten – HARTE Teleportation!")
+print("⚠️ 100% BANN - NUR AUF WEGWERF-ACCOUNTS!")
