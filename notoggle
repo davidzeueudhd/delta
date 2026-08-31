@@ -1,26 +1,24 @@
 --[[
-    MUTAGEN-STYLE DESYNC (NUR DESYNC, KEINE STATS-ÄNDERUNG)
+    MUTAGEN-STYLE DESYNC (OHNE TOGGLE)
     - Kein GUI
     - Keine Veränderung von WalkSpeed oder JumpPower
     - Hook-basierte Desync-Methode
-    - F-Taste zum Ein-/Ausschalten
+    - Startet SOFORT!
 ]]
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 
 local localPlayer = Players.LocalPlayer
 
 -- Tabelle für Desync-Einstellungen
 local desyncT = {
-    enabled = true,          -- Standardmäßig aktiviert
-    loc = CFrame.new()       -- Speichert die echte Position
+    loc = CFrame.new()  -- Speichert die echte Position
 }
 
--- Haupt-Desync-Loop
+-- Haupt-Desync-Loop (läuft sofort)
 RunService.Heartbeat:Connect(function()
-    if desyncT.enabled and localPlayer.Character then
+    if localPlayer.Character then
         local character = localPlayer.Character
         local root = character:FindFirstChild("HumanoidRootPart")
         
@@ -44,10 +42,9 @@ end)
 -- Der entscheidende Hook (manipuliert die zurückgegebene Position)
 local desynchook = nil
 desynchook = hookmetamethod(game, "__index", newcclosure(function(self, key)
-    if desyncT.enabled 
+    if localPlayer.Character 
        and not checkcaller() 
        and key == "CFrame" 
-       and localPlayer.Character 
        and self == localPlayer.Character:FindFirstChild("HumanoidRootPart") then
         -- Gib die gespeicherte echte Position zurück
         return desyncT.loc
@@ -56,18 +53,6 @@ desynchook = hookmetamethod(game, "__index", newcclosure(function(self, key)
     return desynchook(self, key)
 end))
 
--- F-Taste zum Ein- und Ausschalten
-UserInputService.InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.F then
-        desyncT.enabled = not desyncT.enabled
-        if desyncT.enabled then
-            print("🟢 Desync AKTIVIERT")
-        else
-            print("🔴 Desync PAUSIERT")
-        end
-    end
-end)
-
 print("🧠 MUTAGEN-STYLE DESYNC GELADEN!")
-print("📌 F = Desync AN/AUS")
+print("⚡ Läuft SOFORT - kein Toggle nötig!")
 print("⚠️ EXTREM RISKANT - NUR AUF WEGWERF-ACCOUNTS!")
