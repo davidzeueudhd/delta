@@ -70,7 +70,6 @@ local function SetBase()
     BaseMarker = marker
     
     print("🏠 Base set with glowing marker!")
-    print("📍 Marker at: " .. tostring(MyBasePosition))
 end
 
 -- ========== TELEPORT TO BASE ==========
@@ -87,20 +86,20 @@ local function TeleportToBase()
     print("🏠 Teleported to YOUR base!")
 end
 
--- ========== FAST EGG FINDER (Only nests/eggs near players) ==========
+-- ========== FIND BEST EGG (FAST - near player) ==========
 local function GetBestEgg()
     local bestEgg = nil
     local highestValue = -math.huge
     local root = GetRoot()
     if not root then return nil end
     
-    -- Only scan eggs within 500 studs (faster)
+    -- Only scan eggs within 500 studs (fast)
     local scanRadius = 500
     
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("BasePart") or obj:IsA("Model") then
             local name = (obj.Name or ""):lower()
-            -- Check if it's an egg AND near player
+            -- Check for eggs AND nests (player nests)
             if name:find("egg") or name:find("nest") then
                 local pos = obj:IsA("BasePart") and obj.Position or nil
                 if pos then
@@ -112,7 +111,10 @@ local function GetBestEgg()
                             value = valueTag.Value
                         end
                         
-                        if value > highestValue then
+                        -- Also check if it has a ClickDetector (means it's grabable)
+                        local hasClick = obj:FindFirstChild("ClickDetector") ~= nil
+                        
+                        if hasClick and value > highestValue then
                             highestValue = value
                             bestEgg = obj
                         end
@@ -128,14 +130,16 @@ local function GetBestEgg()
         for _, obj in ipairs(Workspace:GetDescendants()) do
             if obj:IsA("BasePart") or obj:IsA("Model") then
                 local name = (obj.Name or ""):lower()
-                if name:find("egg") then
+                if name:find("egg") or name:find("nest") then
                     local value = 0
                     local valueTag = obj:FindFirstChild("Value")
                     if valueTag and valueTag:IsA("IntValue") then
                         value = valueTag.Value
                     end
                     
-                    if value > highestValue then
+                    local hasClick = obj:FindFirstChild("ClickDetector") ~= nil
+                    
+                    if hasClick and value > highestValue then
                         highestValue = value
                         bestEgg = obj
                     end
@@ -147,7 +151,7 @@ local function GetBestEgg()
     return bestEgg, highestValue
 end
 
--- ========== TELEPORT TO BEST EGG ==========
+-- ========== TELEPORT TO BEST EGG + INSTANT GRAB ==========
 local function TeleportToBestEgg()
     local root = GetRoot()
     if not root then return end
@@ -159,20 +163,60 @@ local function TeleportToBestEgg()
     end
     
     print("🥚 Best nearby egg: " .. egg.Name .. " (Value: " .. tostring(value) .. ")")
-    root.CFrame = CFrame.new(egg.Position + Vector3.new(0, 2, 0))
-    task.wait(0.2)
     
-    -- Instant grab
+    -- Teleport to egg
+    root.CFrame = CFrame.new(egg.Position + Vector3.new(0, 2, 0))
+    task.wait(0.05) -- Almost instant
+    
+    -- ========== INSTANT GRAB (MULTIPLE METHODS) ==========
+    local grabbed = false
+    
+    -- Method 1: ClickDetector
     local clickDetector = egg:FindFirstChild("ClickDetector")
     if clickDetector and clickDetector:IsA("ClickDetector") then
         clickDetector:FireClick(LocalPlayer)
-        print("✅ Grabbed egg instantly!")
+        grabbed = true
+        print("✅ Grabbed via ClickDetector!")
     end
     
-    for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
-        if part:IsA("BasePart") then
-            egg.Touched:Fire(part)
+    -- Method 2: Touch
+    if not grabbed then
+        local char = LocalPlayer.Character
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    egg.Touched:Fire(part)
+                end
+            end
+            grabbed = true
+            print("✅ Grabbed via Touch!")
         end
+    end
+    
+    -- Method 3: ProximityPrompt
+    if not grabbed then
+        local prompt = egg:FindFirstChild("ProximityPrompt")
+        if prompt and prompt:IsA("ProximityPrompt") then
+            prompt:InputHoldEnd(LocalPlayer, Enum.UserInputType.MouseButton1)
+            grabbed = true
+            print("✅ Grabbed via ProximityPrompt!")
+        end
+    end
+    
+    -- Method 4: RemoteEvent
+    if not grabbed then
+        local remoteEvent = game:GetService("ReplicatedStorage"):FindFirstChild("CollectEgg")
+        if remoteEvent and remoteEvent:IsA("RemoteEvent") then
+            remoteEvent:FireServer(egg)
+            grabbed = true
+            print("✅ Grabbed via RemoteEvent!")
+        end
+    end
+    
+    if grabbed then
+        print("🥚 EGG GRABBED INSTANTLY!")
+    else
+        print("⚠️ Teleported to egg but couldn't grab it.")
     end
 end
 
@@ -201,7 +245,7 @@ local function CreateGUI()
     title.Size = UDim2.new(1, 0, 0, 35)
     title.BackgroundColor3 = Color3.fromRGB(255, 180, 50)
     title.BackgroundTransparency = 0.3
-    title.Text = "🥚 FAST EGG STEALER"
+    title.Text = "🥚 INSTANT EGG STEALER"
     title.TextColor3 = Color3.fromRGB(255, 255, 255)
     title.TextScaled = true
     title.Font = Enum.Font.GothamBold
@@ -223,7 +267,7 @@ local function CreateGUI()
     tpBtn.Size = UDim2.new(0.8, 0, 0, 35)
     tpBtn.Position = UDim2.new(0.1, 0, 0, 75)
     tpBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-    tpBtn.Text = "🚀 BEST EGG"
+    tpBtn.Text = "🚀 FIND & GRAB"
     tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     tpBtn.TextScaled = true
     tpBtn.Font = Enum.Font.GothamBold
@@ -362,8 +406,8 @@ end
 
 task.wait(0.5)
 CreateGUI()
-print("🥚 FAST EGG STEALER LOADED!")
+print("🥚 INSTANT EGG STEALER LOADED!")
 print("📌 Press R to toggle menu")
-print("🏠 Click 'SET BASE' at YOUR base - green glowing marker appears!")
-print("🚀 Click 'BEST EGG' to find and steal the best nearby egg!")
+print("🏠 Click 'SET BASE' at YOUR base first!")
+print("🚀 Click 'FIND & GRAB' to teleport and grab instantly!")
 ]])()
