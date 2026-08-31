@@ -1,0 +1,122 @@
+--[[
+    DESYNC - LÄNGERE PAUSEN
+    - Bewegung: 0,8 Studs (stark)
+    - Frequenz: Alle 6 Frames (Satz ..... Satz ..... Satz)
+    - WalkSpeed: 35 (NORMAL)
+    - Sanfte Rotation
+    - Grüne Marker
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local client = Players.LocalPlayer
+local clientCharacter = client.Character or client.CharacterAdded:Wait()
+local rootPart = clientCharacter:WaitForChild("HumanoidRootPart")
+
+-- ==============================
+-- GRÜNER MARKER
+-- ==============================
+local function createMarker(position)
+    local marker = Instance.new("Part")
+    marker.Size = Vector3.new(3, 0.5, 3)
+    marker.Position = position
+    marker.Anchored = true
+    marker.CanCollide = false
+    marker.BrickColor = BrickColor.new("Bright green")
+    marker.Material = Enum.Material.Neon
+    marker.Transparency = 0.4
+    marker.Parent = Workspace
+    
+    local glow = Instance.new("PointLight")
+    glow.Parent = marker
+    glow.Color = Color3.fromRGB(0, 255, 0)
+    glow.Range = 8
+    glow.Brightness = 1.5
+    
+    game:GetService("Debris"):AddItem(marker, 15)
+    return marker
+end
+
+-- ==============================
+-- DESYNC MIT LÄNGEREN PAUSEN
+-- ==============================
+local isRunning = true
+local counter = 0
+local originalPosition = rootPart.Position
+
+createMarker(originalPosition)
+print("🟢 Startposition markiert")
+
+-- Desync-Loop (NUR ALLE 6 FRAMES)
+RunService.Heartbeat:Connect(function()
+    if not isRunning then return end
+    if not rootPart or not rootPart.Parent then return end
+    
+    counter = counter + 1
+    
+    -- NUR ALLE 6 FRAMES (Satz ..... Satz ..... Satz)
+    if counter % 6 == 0 then
+        local currentPos = rootPart.Position
+        local newPos = Vector3.new(
+            currentPos.X + math.random(-80, 80) / 100,  -- 0,8 Studs
+            currentPos.Y + math.random(-15, 15) / 100,
+            currentPos.Z + math.random(-80, 80) / 100
+        )
+        
+        -- Sanfte Rotation
+        rootPart.CFrame = CFrame.new(newPos) * CFrame.Angles(
+            math.rad(math.random(-3, 3) / 10),
+            math.rad(math.random(-6, 6) / 10),
+            math.rad(math.random(-3, 3) / 10)
+        )
+        
+        -- Alle 15 Bewegungen neuer Marker
+        if counter % 15 == 0 then
+            createMarker(rootPart.Position)
+        end
+    end
+end)
+
+-- ==============================
+-- WALKSPEED (NORMAL)
+-- ==============================
+local humanoid = clientCharacter:WaitForChild("Humanoid")
+humanoid.WalkSpeed = 35
+humanoid.JumpPower = 60
+
+-- ==============================
+-- F-TASTE ZUM TOGGLEN
+-- ==============================
+local UserInputService = game:GetService("UserInputService")
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.F then
+        isRunning = not isRunning
+        if isRunning then
+            print("🟢 Desync REAKTIVIERT")
+            createMarker(rootPart.Position)
+        else
+            print("🔴 Desync PAUSIERT")
+        end
+    end
+end)
+
+-- ==============================
+-- CHARACTER RESET
+-- ==============================
+client.CharacterAdded:Connect(function(newChar)
+    clientCharacter = newChar
+    rootPart = clientCharacter:WaitForChild("HumanoidRootPart")
+    humanoid = clientCharacter:WaitForChild("Humanoid")
+    humanoid.WalkSpeed = 35
+    humanoid.JumpPower = 60
+    createMarker(rootPart.Position)
+end)
+
+print("⏳ DESYNC MIT LÄNGEREN PAUSEN GELADEN!")
+print("📌 Bewegung: 0,8 Studs")
+print("📌 Frequenz: Alle 6 Frames (Satz ..... Satz ..... Satz)")
+print("📌 WalkSpeed: 35 (NORMAL)")
+print("📌 F = PAUSE/WEITER")
+print("🟢 GRÜNE MARKER AKTIV")
