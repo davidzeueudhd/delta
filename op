@@ -1,5 +1,5 @@
 loadstring([[
-print("🥚 EGG STEALER LOADED!")
+print("🥚 EGG STEALER - TELEPORT TO BEST EGG GUI LOADED!")
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -7,6 +7,9 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
+-- ============================================================
+-- CONFIG
+-- ============================================================
 local CONFIG = {
     AutoReturnDelay = 1,
     GrabAttempts = 3,
@@ -22,7 +25,7 @@ local CONFIG = {
 -- EXCLUDE WORDS (TREADMILLS & TRAINING EQUIPMENT)
 -- ============================================================
 local EXCLUDE_WORDS = {
-    "treadmill", "laufband", "run", "running", "track", "train", 
+    "treadmill", "laufband", "run", "running", "track", "train",
     "workout", "exercise", "gym", "speed", "boost"
 }
 
@@ -36,6 +39,9 @@ local function IsExcluded(name)
     return false
 end
 
+-- ============================================================
+-- HELPERS
+-- ============================================================
 local function GetRoot()
     local char = LocalPlayer.Character
     if not char then return nil end
@@ -49,6 +55,9 @@ local function TeleportTo(pos)
     return true
 end
 
+-- ============================================================
+-- FIND BEST EGG IN SERVER (with biome/rarity scoring)
+-- ============================================================
 local function FindBestEgg()
     local root = GetRoot()
     if not root then return nil end
@@ -58,23 +67,22 @@ local function FindBestEgg()
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("BasePart") then
             local name = obj.Name or ""
-            
-            -- EXCLUDE treadmills and training equipment
-            if IsExcluded(name) then
-                goto continue
-            end
 
+            -- Skip excluded
+            if IsExcluded(name) then goto continue end
+
+            -- Must be egg or nest
             if not name:lower():find("egg") and not name:lower():find("nest") then
                 goto continue
             end
 
+            -- Must have ClickDetector (stealable)
             local hasClick = obj:FindFirstChild("ClickDetector") ~= nil
-            if not hasClick then
-                goto continue
-            end
+            if not hasClick then goto continue end
 
             local score = 0
 
+            -- Biome bonus
             for i, biome in ipairs(CONFIG.TopBiomes) do
                 if name:lower():find(biome:lower()) then
                     score = score + (10 - i) * 100
@@ -82,6 +90,7 @@ local function FindBestEgg()
                 end
             end
 
+            -- Rarity bonus
             for keyword, points in pairs(CONFIG.RarityKeywords) do
                 if name:lower():find(keyword) then
                     score = score + points
@@ -89,19 +98,23 @@ local function FindBestEgg()
                 end
             end
 
+            -- Value tag
             local valueTag = obj:FindFirstChild("Value")
             if valueTag and valueTag:IsA("IntValue") then
                 score = score + valueTag.Value
             end
 
+            -- Size bonus
             if obj:IsA("BasePart") then
                 local size = obj.Size
                 score = score + (size.X * size.Y * size.Z) * 10
             end
 
+            -- Distance penalty (closer is better)
             local dist = (obj.Position - root.Position).Magnitude
             score = score - math.floor(dist / 20)
 
+            -- Nest bonus
             if name:lower():find("nest") then
                 score = score + 50
             end
@@ -115,9 +128,28 @@ local function FindBestEgg()
         end
     end
 
-    return bestEgg
+    return bestEgg, bestScore
 end
 
+-- ============================================================
+-- TELEPORT TO BEST EGG (ONLY TELEPORT, NO GRAB)
+-- ============================================================
+local function TeleportToBestEgg()
+    local egg, score = FindBestEgg()
+    if not egg then
+        print("❌ No egg found!")
+        return false
+    end
+
+    print("🥚 Best egg: " .. egg.Name .. " (Score: " .. math.floor(score) .. ")")
+    TeleportTo(egg.Position + Vector3.new(0, 2, 0))
+    print("✅ Teleported to best egg!")
+    return true
+end
+
+-- ============================================================
+-- GRAB EGG
+-- ============================================================
 local function GrabEgg(egg)
     if not egg or not egg:IsA("BasePart") then return false end
     local grabbed = false
@@ -165,6 +197,9 @@ local function GrabEgg(egg)
     return grabbed
 end
 
+-- ============================================================
+-- STEAL & RETURN (teleport → grab → return to base)
+-- ============================================================
 local MyBase = nil
 local BaseMarker = nil
 
@@ -172,7 +207,6 @@ local function SetBase()
     local root = GetRoot()
     if not root then return end
     MyBase = root.Position
-
     if BaseMarker then BaseMarker:Destroy() end
 
     local marker = Instance.new("Part")
@@ -205,7 +239,7 @@ local function TeleportToBase()
 end
 
 local function StealBestEgg()
-    local egg = FindBestEgg()
+    local egg, score = FindBestEgg()
     if not egg then
         print("❌ Kein Ei gefunden!")
         return false
@@ -241,6 +275,9 @@ local function StealBestEgg()
     return true
 end
 
+-- ============================================================
+-- AUTO MODE
+-- ============================================================
 local autoMode = false
 local autoConnection = nil
 local isRunning = false
@@ -268,6 +305,9 @@ local function StopAutoMode()
     print("⏹️ AUTO-MODE AUS!")
 end
 
+-- ============================================================
+-- GUI
+-- ============================================================
 local function CreateGUI()
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "EggStealer"
@@ -287,6 +327,7 @@ local function CreateGUI()
     corner.CornerRadius = UDim.new(0, 12)
     corner.Parent = frame
 
+    -- Title
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(1, 0, 0, 45)
     title.BackgroundColor3 = Color3.fromRGB(255, 180, 50)
@@ -297,6 +338,7 @@ local function CreateGUI()
     title.Font = Enum.Font.GothamBold
     title.Parent = frame
 
+    -- Status
     local status = Instance.new("TextLabel")
     status.Size = UDim2.new(1, 0, 0, 25)
     status.Position = UDim2.new(0, 0, 0, 50)
@@ -307,6 +349,7 @@ local function CreateGUI()
     status.Font = Enum.Font.GothamBold
     status.Parent = frame
 
+    -- Current best egg label
     local currentEggLabel = Instance.new("TextLabel")
     currentEggLabel.Size = UDim2.new(1, 0, 0, 25)
     currentEggLabel.Position = UDim2.new(0, 0, 0, 78)
@@ -317,9 +360,26 @@ local function CreateGUI()
     currentEggLabel.Font = Enum.Font.GothamMedium
     currentEggLabel.Parent = frame
 
+    -- BUTTON: Teleport to Best Egg (only teleport)
+    local tpBtn = Instance.new("TextButton")
+    tpBtn.Size = UDim2.new(0.8, 0, 0, 35)
+    tpBtn.Position = UDim2.new(0.1, 0, 0, 118)
+    tpBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+    tpBtn.Text = "🚀 TP ZU BESTEM EI"
+    tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tpBtn.TextScaled = true
+    tpBtn.Font = Enum.Font.GothamBold
+    tpBtn.BorderSizePixel = 0
+    tpBtn.Parent = frame
+
+    local tpCorner = Instance.new("UICorner")
+    tpCorner.CornerRadius = UDim.new(0, 10)
+    tpCorner.Parent = tpBtn
+
+    -- BUTTON: Steal & Return
     local stealBtn = Instance.new("TextButton")
-    stealBtn.Size = UDim2.new(0.8, 0, 0, 40)
-    stealBtn.Position = UDim2.new(0.1, 0, 0, 118)
+    stealBtn.Size = UDim2.new(0.8, 0, 0, 35)
+    stealBtn.Position = UDim2.new(0.1, 0, 0, 163)
     stealBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
     stealBtn.Text = "🥚 STEAL & RETURN"
     stealBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -328,13 +388,14 @@ local function CreateGUI()
     stealBtn.BorderSizePixel = 0
     stealBtn.Parent = frame
 
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0, 10)
-    btnCorner.Parent = stealBtn
+    local stealCorner = Instance.new("UICorner")
+    stealCorner.CornerRadius = UDim.new(0, 10)
+    stealCorner.Parent = stealBtn
 
+    -- BUTTON: Auto Mode
     local autoBtn = Instance.new("TextButton")
-    autoBtn.Size = UDim2.new(0.8, 0, 0, 40)
-    autoBtn.Position = UDim2.new(0.1, 0, 0, 168)
+    autoBtn.Size = UDim2.new(0.8, 0, 0, 35)
+    autoBtn.Position = UDim2.new(0.1, 0, 0, 208)
     autoBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     autoBtn.Text = "⏹️ AUTO: AUS"
     autoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -347,9 +408,10 @@ local function CreateGUI()
     autoCorner.CornerRadius = UDim.new(0, 10)
     autoCorner.Parent = autoBtn
 
+    -- BUTTON: Set Base
     local setBaseBtn = Instance.new("TextButton")
-    setBaseBtn.Size = UDim2.new(0.38, 0, 0, 35)
-    setBaseBtn.Position = UDim2.new(0.06, 0, 0, 222)
+    setBaseBtn.Size = UDim2.new(0.38, 0, 0, 30)
+    setBaseBtn.Position = UDim2.new(0.06, 0, 0, 258)
     setBaseBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
     setBaseBtn.Text = "🏠 SET BASE"
     setBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -362,9 +424,10 @@ local function CreateGUI()
     baseCorner.CornerRadius = UDim.new(0, 8)
     baseCorner.Parent = setBaseBtn
 
+    -- BUTTON: TP to Base
     local tpBaseBtn = Instance.new("TextButton")
-    tpBaseBtn.Size = UDim2.new(0.38, 0, 0, 35)
-    tpBaseBtn.Position = UDim2.new(0.56, 0, 0, 222)
+    tpBaseBtn.Size = UDim2.new(0.38, 0, 0, 30)
+    tpBaseBtn.Position = UDim2.new(0.56, 0, 0, 258)
     tpBaseBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
     tpBaseBtn.Text = "🏠 TP BASE"
     tpBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -377,16 +440,18 @@ local function CreateGUI()
     tpBaseCorner.CornerRadius = UDim.new(0, 8)
     tpBaseCorner.Parent = tpBaseBtn
 
+    -- Info
     local infoLabel = Instance.new("TextLabel")
-    infoLabel.Size = UDim2.new(1, 0, 0, 60)
-    infoLabel.Position = UDim2.new(0, 0, 0, 275)
+    infoLabel.Size = UDim2.new(1, 0, 0, 50)
+    infoLabel.Position = UDim2.new(0, 0, 0, 308)
     infoLabel.BackgroundTransparency = 1
-    infoLabel.Text = "🔍 Sucht in Top-Biomen\n⚡ Teleport → Einsammeln → Base"
+    infoLabel.Text = "🔍 Findet bestes Ei (Seltenheit/Biom)\n⚡ TP ZU BESTEM EI = nur Teleport"
     infoLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
     infoLabel.TextScaled = true
     infoLabel.Font = Enum.Font.GothamMedium
     infoLabel.Parent = frame
 
+    -- Close
     local close = Instance.new("TextButton")
     close.Size = UDim2.new(0, 30, 0, 30)
     close.Position = UDim2.new(1, -40, 0, 8)
@@ -408,6 +473,27 @@ local function CreateGUI()
         print("❌ GUI geschlossen!")
     end)
 
+    -- ============================================================
+    -- BUTTON EVENTS
+    -- ============================================================
+
+    -- TP ZU BESTEM EI (nur Teleport)
+    tpBtn.MouseButton1Click:Connect(function()
+        status.Text = "⏳ Suche bestes Ei..."
+        status.TextColor3 = Color3.fromRGB(255, 200, 0)
+        local success = TeleportToBestEgg()
+        if success then
+            status.Text = "✅ Teleportiert!"
+            status.TextColor3 = Color3.fromRGB(0, 255, 100)
+        else
+            status.Text = "❌ Kein Ei gefunden!"
+            status.TextColor3 = Color3.fromRGB(255, 0, 0)
+        end
+        task.wait(2)
+        status.Text = "🟢 Bereit"
+    end)
+
+    -- STEAL & RETURN
     stealBtn.MouseButton1Click:Connect(function()
         if not MyBase then
             status.Text = "❌ Base zuerst setzen!"
@@ -425,6 +511,7 @@ local function CreateGUI()
         status.Text = "🟢 Bereit"
     end)
 
+    -- AUTO
     autoBtn.MouseButton1Click:Connect(function()
         if autoMode then
             StopAutoMode()
@@ -448,6 +535,7 @@ local function CreateGUI()
         end
     end)
 
+    -- SET BASE
     setBaseBtn.MouseButton1Click:Connect(function()
         SetBase()
         status.Text = "✅ Base gesetzt!"
@@ -456,6 +544,7 @@ local function CreateGUI()
         status.Text = "🟢 Bereit"
     end)
 
+    -- TP BASE
     tpBaseBtn.MouseButton1Click:Connect(function()
         if not MyBase then
             status.Text = "❌ Keine Base!"
@@ -473,6 +562,7 @@ local function CreateGUI()
         status.Text = "🟢 Bereit"
     end)
 
+    -- Toggle with R
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         if input.KeyCode == Enum.KeyCode.R then
@@ -480,11 +570,12 @@ local function CreateGUI()
         end
     end)
 
+    -- Update current egg label
     RunService.Heartbeat:Connect(function()
         if frame.Visible then
-            local egg = FindBestEgg()
+            local egg, score = FindBestEgg()
             if egg then
-                currentEggLabel.Text = "Bestes Ei: " .. egg.Name
+                currentEggLabel.Text = "Bestes Ei: " .. egg.Name .. " (Score: " .. math.floor(score) .. ")"
             else
                 currentEggLabel.Text = "Bestes Ei: -"
             end
@@ -498,7 +589,7 @@ task.wait(0.5)
 CreateGUI()
 print("🥚 EGG STEALER GELADEN!")
 print("📌 Drücke R zum ein-/ausblenden")
-print("🏠 Setze zuerst deine Base (SET BASE)")
+print("🚀 'TP ZU BESTEM EI' = nur Teleport zum besten Ei")
 print("🥚 'STEAL & RETURN' = Teleport → Einsammeln → Base")
 print("🔄 'AUTO' = permanentes Scannen & Stehlen")
 ]])()
