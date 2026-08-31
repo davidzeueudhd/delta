@@ -1,10 +1,9 @@
 --[[
-    DESYNC - LÄNGERE PAUSEN
-    - Bewegung: 0,8 Studs (stark)
+    DESYNC - MARKER LANGSAMER, SPEED NORMAL
+    - Desync: 0,8 Studs
     - Frequenz: Alle 6 Frames (Satz ..... Satz ..... Satz)
     - WalkSpeed: 35 (NORMAL)
-    - Sanfte Rotation
-    - Grüne Marker
+    - Grüne Marker: Alle 30 Bewegungen (LANGSAMER)
 ]]
 
 local Players = game:GetService("Players")
@@ -71,19 +70,20 @@ RunService.Heartbeat:Connect(function()
             math.rad(math.random(-3, 3) / 10)
         )
         
-        -- Alle 15 Bewegungen neuer Marker
-        if counter % 15 == 0 then
+        -- Alle 30 Bewegungen NEUER MARKER (LANGSAMER!)
+        if counter % 30 == 0 then
             createMarker(rootPart.Position)
+            print("🟢 Neue Position markiert")
         end
     end
 end)
 
 -- ==============================
--- WALKSPEED (NORMAL)
+-- WALKSPEED (NORMAL!)
 -- ==============================
 local humanoid = clientCharacter:WaitForChild("Humanoid")
-humanoid.WalkSpeed = 35
-humanoid.JumpPower = 60
+humanoid.WalkSpeed = 35  -- NORMAL
+humanoid.JumpPower = 60  -- NORMAL
 
 -- ==============================
 -- F-TASTE ZUM TOGGLEN
@@ -109,14 +109,14 @@ client.CharacterAdded:Connect(function(newChar)
     clientCharacter = newChar
     rootPart = clientCharacter:WaitForChild("HumanoidRootPart")
     humanoid = clientCharacter:WaitForChild("Humanoid")
-    humanoid.WalkSpeed = 35
-    humanoid.JumpPower = 60
+    humanoid.WalkSpeed = 35  -- NORMAL
+    humanoid.JumpPower = 60  -- NORMAL
     createMarker(rootPart.Position)
 end)
 
-print("⏳ DESYNC MIT LÄNGEREN PAUSEN GELADEN!")
-print("📌 Bewegung: 0,8 Studs")
+print("⏳ DESYNC - MARKER LANGSAMER GELADEN!")
+print("📌 Desync: 0,8 Studs")
 print("📌 Frequenz: Alle 6 Frames (Satz ..... Satz ..... Satz)")
 print("📌 WalkSpeed: 35 (NORMAL)")
+print("📌 Grüne Marker: Alle 30 Bewegungen (LANGSAMER)")
 print("📌 F = PAUSE/WEITER")
-print("🟢 GRÜNE MARKER AKTIV")
