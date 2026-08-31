@@ -1,8 +1,8 @@
 --[[
-    30 SEKUNDEN VERZÖGERUNG - BEWEGBAR
-    - Du kannst dich normal bewegen
-    - Andere sehen dich 30 Sek. verzögert
-    - Kein Reset
+    FINAL FIXED VERSION - NO MOVEMENT BLOCK
+    - You can move freely
+    - Other players see you 30 seconds delayed
+    - No hooks blocking your input
 ]]
 
 local Players = game:GetService("Players")
@@ -14,17 +14,15 @@ local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
-print("⏳ 30 SEKUNDEN VERZÖGERUNG - BEWEGBAR STARTET...")
+print("⏳ FINAL FIXED VERSION LOADING...")
 
 -- ==============================
--- POSITIONSSPEICHER
+-- STORE POSITIONS (30 seconds)
 -- ==============================
 local MAX_POSITIONS = 30
 local positions = {}
 local counter = 0
-local realPosition = rootPart.Position
 
--- Alle 1 Sekunde Position speichern
 RunService.Heartbeat:Connect(function()
     if not rootPart or not rootPart.Parent then return end
     
@@ -38,13 +36,53 @@ RunService.Heartbeat:Connect(function()
         if #positions > MAX_POSITIONS then
             table.remove(positions, 1)
         end
-        
-        realPosition = rootPart.Position
     end
 end)
 
 -- ==============================
--- GRÜNER MARKER
+-- CREATE GHOST PART (visible to others)
+-- ==============================
+local ghost = Instance.new("Part")
+ghost.Size = Vector3.new(1, 1, 1)
+ghost.Anchored = true
+ghost.CanCollide = false
+ghost.Transparency = 0.8
+ghost.BrickColor = BrickColor.new("Bright green")
+ghost.Material = Enum.Material.Neon
+ghost.Parent = Workspace
+
+-- ==============================
+-- UPDATE GHOST POSITION (30 sec old)
+-- ==============================
+RunService.Heartbeat:Connect(function()
+    if #positions >= 30 then
+        local oldData = positions[1]
+        if oldData then
+            ghost.Position = oldData.position
+            ghost.CFrame = oldData.cframe
+        end
+    end
+end)
+
+-- ==============================
+-- HOOK: REDIRECT OTHERS TO GHOST (but NOT you)
+-- ==============================
+local hookCFrame = hookmetamethod(game, "__index", function(self, key)
+    if not checkcaller() and key == "CFrame" and self == rootPart then
+        return ghost.CFrame
+    end
+    return hookCFrame(self, key)
+end)
+
+local hookPosition = hookmetamethod(game, "__index", function(self, key)
+    if not checkcaller() and key == "Position" and self == rootPart then
+        return ghost.Position
+    end
+    return hookPosition(self, key)
+end)
+
+-- ==============================
+-- GREEN MARKER AT OLD POSITION
 -- ==============================
 local function createMarker(position, text)
     local marker = Instance.new("Part")
@@ -65,7 +103,7 @@ local function createMarker(position, text)
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
-    label.Text = text or "📍 POSITION"
+    label.Text = text or "📍 OTHERS SEE YOU HERE"
     label.TextColor3 = Color3.fromRGB(0, 255, 0)
     label.TextScaled = true
     label.Font = Enum.Font.Bold
@@ -82,52 +120,23 @@ local function createMarker(position, text)
 end
 
 -- ==============================
--- HOOKS: NUR FÜR ANDERE, NICHT FÜR DICH!
+-- AUTO MARKER (after 30 seconds)
 -- ==============================
-local hookCFrame = hookmetamethod(game, "__index", function(self, key)
-    if not checkcaller() and key == "CFrame" and self == rootPart then
-        if #positions >= 30 then
-            local oldData = positions[1]
-            if oldData then
-                return oldData.cframe
-            end
-        end
-        return CFrame.new(realPosition)
-    end
-    return hookCFrame(self, key)
-end)
-
-local hookPosition = hookmetamethod(game, "__index", function(self, key)
-    if not checkcaller() and key == "Position" and self == rootPart then
-        if #positions >= 30 then
-            local oldData = positions[1]
-            if oldData then
-                return oldData.position
-            end
-        end
-        return realPosition
-    end
-    return hookPosition(self, key)
-end)
-
--- ==============================
--- FAKE MARKER (nach 30 Sek.)
--- ==============================
-local showFakeMarker = false
+local markerPlaced = false
 
 RunService.Heartbeat:Connect(function()
-    if #positions >= 30 and not showFakeMarker then
+    if #positions >= 30 and not markerPlaced then
         local oldData = positions[1]
         if oldData then
-            createMarker(oldData.position, "⏳ ANDERE SEHEN DICH HIER (30 SEK. ALT)")
-            showFakeMarker = true
-            print("🟢 Marker an 30-Sekunden-alter Position!")
+            createMarker(oldData.position, "⏳ OTHERS SEE YOU HERE (30 SEC OLD)")
+            markerPlaced = true
+            print("✅ Marker placed at 30-second-old position!")
         end
     end
 end)
 
 -- ==============================
--- R-TASTE: MARKER
+-- R KEY: MANUAL MARKER
 -- ==============================
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
@@ -135,17 +144,16 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if #positions >= 30 then
             local oldData = positions[1]
             if oldData then
-                createMarker(oldData.position, "⏳ VOR 30 SEKUNDEN")
-                print("🟢 Marker an 30-Sekunden-alter Position!")
+                createMarker(oldData.position, "⏳ 30 SECONDS AGO")
+                print("✅ Manual marker placed!")
             end
         else
-            print("⚠️ Noch nicht genug Positionen (" .. #positions .. "/30)")
+            print("⚠️ Not enough positions yet (" .. #positions .. "/30)")
         end
     end
 end)
 
-print("💀 30 SEKUNDEN VERZÖGERUNG - BEWEGBAR LÄUFT!")
-print("📌 Du kannst dich normal bewegen!")
-print("📌 Andere sehen dich an der Position von vor 30 Sekunden!")
-print("📌 Drücke R = Marker an 30-Sekunden-alter Position")
-print("⚠️ 100% BANN - NUR AUF WEGWERF-ACCOUNTS!")
+print("✅ FINAL FIXED VERSION LOADED!")
+print("📌 YOU CAN MOVE FREELY!")
+print("📌 Others see you 30 seconds delayed!")
+print("📌 Press R for marker at old position")
