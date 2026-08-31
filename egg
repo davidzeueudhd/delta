@@ -1,217 +1,64 @@
---[[
-    Script Name: 🥚 EGG SPAWNER
-    Type: LocalScript
-    Description: Spawns eggs directly into your inventory
-]]
+-- TEST SCRIPT - Run this first to see if anything works
 
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
-local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
+print("🔍 TEST STARTING...")
 
--- ========== EGG NAMES ==========
-local EggNames = {
-    "Egg",
-    "GoldenEgg",
-    "DragonEgg",
-    "PhoenixEgg",
-    "UnicornEgg",
-    "MythicalEgg",
-    "GodlyEgg",
-    "RainbowEgg",
-    "DarkEgg",
-    "CrystalEgg",
-    "DivineEgg",
-    "CosmicEgg",
-    "CelestialEgg",
-    "LegendaryEgg",
-    "AncientEgg",
-}
+-- Test 1: Check if script is running
+print("✅ Script is running!")
 
--- ========== FIND INVENTORY ==========
-local function FindInventory()
-    local locations = {
-        LocalPlayer:FindFirstChild("Backpack"),
-        LocalPlayer:FindFirstChild("Inventory"),
-        LocalPlayer:FindFirstChild("StarterGear"),
-        LocalPlayer:FindFirstChild("Items"),
-        workspace:FindFirstChild("Inventory"),
-    }
-    for _, loc in ipairs(locations) do
-        if loc then return loc end
+-- Test 2: Check player
+local LocalPlayer = game:GetService("Players").LocalPlayer
+print("✅ Player: " .. LocalPlayer.Name)
+
+-- Test 3: Check workspace for eggs
+local eggs = {}
+for _, obj in ipairs(workspace:GetDescendants()) do
+    local name = (obj.Name or ""):lower()
+    if name:find("egg") then
+        table.insert(eggs, obj)
     end
-    return LocalPlayer
+end
+print("✅ Eggs found: " .. #eggs)
+
+-- Test 4: Check if we can create a part
+local testPart = Instance.new("Part")
+testPart.Name = "TestPart"
+testPart.Size = Vector3.new(1, 1, 1)
+testPart.Anchored = true
+testPart.Position = Vector3.new(0, 10, 0)
+testPart.Parent = workspace
+print("✅ Created test part at 0, 10, 0")
+
+-- Test 5: Try to create a tool (egg)
+local testTool = Instance.new("Tool")
+testTool.Name = "TestEgg"
+testTool.RequiresHandle = false
+
+local handle = Instance.new("Part")
+handle.Name = "Handle"
+handle.Size = Vector3.new(1, 1, 1)
+handle.Color = Color3.fromRGB(255, 215, 0)
+handle.Material = Enum.Material.Neon
+handle.Parent = testTool
+
+-- Try different inventory locations
+local backpack = LocalPlayer:FindFirstChild("Backpack")
+local inventory = LocalPlayer:FindFirstChild("Inventory")
+local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+
+if backpack then
+    testTool.Parent = backpack
+    print("✅ Test egg added to Backpack!")
+elseif inventory then
+    testTool.Parent = inventory
+    print("✅ Test egg added to Inventory!")
+elseif playerGui then
+    testTool.Parent = playerGui
+    print("✅ Test egg added to PlayerGui!")
+else
+    testTool.Parent = LocalPlayer
+    print("✅ Test egg added to LocalPlayer!")
 end
 
--- ========== SPAWN EGG ==========
-local function SpawnEgg()
-    local eggName = EggNames[math.random(1, #EggNames)]
-    print("🥚 Spawning: " .. eggName)
-    
-    local success = false
-    
-    -- METHOD 1: Try remote events
-    local remotes = {}
-    for _, child in ipairs(ReplicatedStorage:GetChildren()) do
-        if child:IsA("RemoteEvent") then
-            table.insert(remotes, child)
-        end
-    end
-    
-    for _, remote in ipairs(remotes) do
-        local name = (remote.Name or ""):lower()
-        if name:find("give") or name:find("add") or name:find("spawn") or name:find("egg") then
-            pcall(function()
-                remote:FireServer(eggName, 1)
-                remote:FireServer(eggName, LocalPlayer, 1)
-                remote:FireServer({Name = eggName, Amount = 1})
-                remote:FireServer(eggName, "Backpack")
-                success = true
-                print("✅ Spawned via remote: " .. remote.Name)
-            end)
-            if success then break end
-        end
-    end
-    
-    -- METHOD 2: Clone existing egg
-    if not success then
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if obj:IsA("Tool") or obj:IsA("Model") then
-                local name = (obj.Name or ""):lower()
-                if name:find("egg") then
-                    local clone = obj:Clone()
-                    clone.Parent = FindInventory()
-                    print("✅ Cloned: " .. clone.Name)
-                    success = true
-                    break
-                end
-            end
-        end
-    end
-    
-    -- METHOD 3: Create new egg tool
-    if not success then
-        local tool = Instance.new("Tool")
-        tool.Name = eggName
-        tool.RequiresHandle = false
-        
-        local handle = Instance.new("Part")
-        handle.Name = "Handle"
-        handle.Size = Vector3.new(2, 3, 2)
-        handle.Shape = Enum.PartType.Ball
-        handle.Color = Color3.fromRGB(255, 215, 0)
-        handle.Material = Enum.Material.Neon
-        handle.Anchored = false
-        handle.CanCollide = false
-        handle.Parent = tool
-        
-        tool.Parent = FindInventory()
-        print("✅ Created: " .. tool.Name)
-        success = true
-    end
-    
-    return success
-end
-
--- ========== GUI ==========
-local function CreateMenu()
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "EggSpawner"
-    screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-    
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 220, 0, 120)
-    frame.Position = UDim2.new(0.5, -110, 0.5, -60)
-    frame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
-    frame.BackgroundTransparency = 0.15
-    frame.BorderSizePixel = 0
-    frame.Active = true
-    frame.Draggable = true
-    frame.Parent = screenGui
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = frame
-    
-    -- Title
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, 35)
-    title.Position = UDim2.new(0, 0, 0, 0)
-    title.BackgroundColor3 = Color3.fromRGB(255, 180, 50)
-    title.BackgroundTransparency = 0.3
-    title.Text = "🥚 EGG SPAWNER"
-    title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    title.TextScaled = true
-    title.Font = Enum.Font.GothamBold
-    title.Parent = frame
-    
-    -- Status
-    local status = Instance.new("TextLabel")
-    status.Size = UDim2.new(1, 0, 0, 20)
-    status.Position = UDim2.new(0, 0, 0, 38)
-    status.BackgroundTransparency = 1
-    status.Text = "🟢 Ready"
-    status.TextColor3 = Color3.fromRGB(0, 255, 100)
-    status.TextScaled = true
-    status.Font = Enum.Font.GothamBold
-    status.Parent = frame
-    
-    -- Spawn Button
-    local spawnBtn = Instance.new("TextButton")
-    spawnBtn.Size = UDim2.new(0.8, 0, 0, 35)
-    spawnBtn.Position = UDim2.new(0.1, 0, 0, 62)
-    spawnBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-    spawnBtn.Text = "🌟 SPAWN"
-    spawnBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    spawnBtn.TextScaled = true
-    spawnBtn.Font = Enum.Font.GothamBold
-    spawnBtn.BorderSizePixel = 0
-    spawnBtn.Parent = frame
-    
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0, 10)
-    btnCorner.Parent = spawnBtn
-    
-    -- Close
-    local close = Instance.new("TextButton")
-    close.Size = UDim2.new(0, 22, 0, 22)
-    close.Position = UDim2.new(1, -30, 0, 6)
-    close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    close.Text = "✕"
-    close.TextColor3 = Color3.fromRGB(255, 255, 255)
-    close.TextScaled = true
-    close.Font = Enum.Font.GothamBold
-    close.BorderSizePixel = 0
-    close.Parent = frame
-    
-    local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(0, 8)
-    closeCorner.Parent = close
-    
-    spawnBtn.MouseButton1Click:Connect(function()
-        status.Text = "⏳ Spawning..."
-        status.TextColor3 = Color3.fromRGB(255, 200, 0)
-        SpawnEgg()
-        status.Text = "🟢 Ready"
-        status.TextColor3 = Color3.fromRGB(0, 255, 100)
-    end)
-    
-    close.MouseButton1Click:Connect(function()
-        screenGui:Destroy()
-    end)
-    
-    UserInputService.InputBegan:Connect(function(input, processed)
-        if processed then return end
-        if input.KeyCode == Enum.KeyCode.R then
-            frame.Visible = not frame.Visible
-        end
-    end)
-end
-
--- ========== LOAD ==========
-task.wait(0.5)
-CreateMenu()
-print("🥚 EGG SPAWNER LOADED!")
-print("📌 Press 'R' to toggle menu")
-print("🌟 Click 'SPAWN' to spawn an egg into your inventory")
+print("🔍 TEST COMPLETE!")
+print("📌 Check your inventory for 'TestEgg'")
+print("📌 Check workspace for 'TestPart' at position 0, 10, 0")
