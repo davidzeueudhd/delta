@@ -1,0 +1,145 @@
+--[[
+    ULTIMATIVE DESYNC - ÜBERTRIEBEN ABER SICHER
+    - 60 Sekunden Verzögerung (doppelt so lang)
+    - 5 Geister-Parts (andere sehen dich an 5 Orten gleichzeitig)
+    - Du bewegst dich normal
+    - Keine Hooks, kein Speed, kein GUI
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+local MAX_POSITIONS = 60
+local positions = {}
+local counter = 0
+
+RunService.Heartbeat:Connect(function()
+    if not rootPart or not rootPart.Parent then return end
+    counter = counter + 1
+    if counter % 60 == 0 then
+        table.insert(positions, {
+            position = rootPart.Position,
+            cframe = rootPart.CFrame
+        })
+        if #positions > MAX_POSITIONS then
+            table.remove(positions, 1)
+        end
+    end
+end)
+
+-- ==============================
+-- 5 GEISTER-PARTS (verschiedene Farben)
+-- ==============================
+local ghosts = {}
+local colors = {
+    BrickColor.new("Bright green"),
+    BrickColor.new("Bright blue"),
+    BrickColor.new("Bright red"),
+    BrickColor.new("Bright yellow"),
+    BrickColor.new("Bright violet")
+}
+
+for i = 1, 5 do
+    local ghost = Instance.new("Part")
+    ghost.Size = Vector3.new(2, 2, 2)
+    ghost.Anchored = true
+    ghost.CanCollide = false
+    ghost.Transparency = 0.5
+    ghost.BrickColor = colors[i]
+    ghost.Material = Enum.Material.Neon
+    ghost.Parent = Workspace
+    table.insert(ghosts, ghost)
+end
+
+-- ==============================
+-- GEISTER AKTUALISIEREN
+-- ==============================
+RunService.Heartbeat:Connect(function()
+    if #positions >= 60 then
+        for i = 1, 5 do
+            local index = i * 10  -- 10, 20, 30, 40, 50 Sekunden alt
+            if positions[index] then
+                ghosts[i].Position = positions[index].position
+                ghosts[i].CFrame = positions[index].cframe
+            end
+        end
+    end
+end)
+
+-- ==============================
+-- GRÜNER MARKER (für jede Geister-Position)
+-- ==============================
+local function createMarker(position, text, color)
+    local marker = Instance.new("Part")
+    marker.Size = Vector3.new(8, 1, 8)
+    marker.Position = position
+    marker.Anchored = true
+    marker.CanCollide = false
+    marker.BrickColor = color or BrickColor.new("Bright green")
+    marker.Material = Enum.Material.Neon
+    marker.Transparency = 0.2
+    marker.Parent = Workspace
+    
+    local billboard = Instance.new("BillboardGui")
+    billboard.Size = UDim2.new(0, 300, 0, 40)
+    billboard.StudsOffset = Vector3.new(0, 4, 0)
+    billboard.Parent = marker
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text or "📍 GEIST"
+    label.TextColor3 = Color3.fromRGB(0, 255, 0)
+    label.TextScaled = true
+    label.Font = Enum.Font.Bold
+    label.Parent = billboard
+    
+    local glow = Instance.new("PointLight")
+    glow.Parent = marker
+    glow.Color = Color3.fromRGB(0, 255, 0)
+    glow.Range = 25
+    glow.Brightness = 15
+    
+    game:GetService("Debris"):AddItem(marker, 45)
+    return marker
+end
+
+-- ==============================
+-- AUTO MARKER (nach 60 Sek.)
+-- ==============================
+local markerPlaced = false
+
+RunService.Heartbeat:Connect(function()
+    if #positions >= 60 and not markerPlaced then
+        for i = 1, 5 do
+            local index = i * 10
+            if positions[index] then
+                createMarker(positions[index].position, "⏳ " .. (i * 10) .. " SEK. ALT", colors[i])
+            end
+        end
+        markerPlaced = true
+    end
+end)
+
+-- ==============================
+-- R-TASTE: ALLE GEISTER MARKIEREN
+-- ==============================
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.R then
+        if #positions >= 60 then
+            for i = 1, 5 do
+                local index = i * 10
+                if positions[index] then
+                    createMarker(positions[index].position, "⏳ " .. (i * 10) .. " SEK. ALT", colors[i])
+                end
+            end
+        end
+    end
+end)
