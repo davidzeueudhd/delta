@@ -1,0 +1,164 @@
+--[[
+    MUTAGEN STYLE - GENAU WIE ORIGINAL
+    - Character resettet
+    - Andere sehen dich an anderer Position
+    - Grüner Marker zeigt an, wo der Server dich sieht
+]]
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+-- ==============================
+-- STEP 1: CHARACTER RESETTEN
+-- ==============================
+print("🔄 Reset: Character wird zurückgesetzt...")
+
+-- Character töten (respawnen)
+character.Humanoid.Health = 0
+
+-- Warten, bis er neu gespawnt ist
+local newChar = player.CharacterAdded:Wait()
+character = newChar
+rootPart = character:WaitForChild("HumanoidRootPart")
+
+print("✅ Character neu gespawnt!")
+
+-- ==============================
+-- STEP 2: FAKE POSITION FÜR ANDERE
+-- ==============================
+local fakePosition = rootPart.Position + Vector3.new(
+    math.random(-200, 200) / 100,  -- 2,0 Studs versetzt
+    math.random(-40, 40) / 100,
+    math.random(-200, 200) / 100
+)
+
+-- ==============================
+-- STEP 3: GRÜNER MARKER AN FAKE POSITION
+-- ==============================
+local function createMarker(position)
+    local marker = Instance.new("Part")
+    marker.Size = Vector3.new(5, 1, 5)
+    marker.Position = position
+    marker.Anchored = true
+    marker.CanCollide = false
+    marker.BrickColor = BrickColor.new("Bright green")
+    marker.Material = Enum.Material.Neon
+    marker.Transparency = 0.3
+    marker.Parent = Workspace
+    
+    -- Text "FAKE POSITION"
+    local billboard = Instance.new("BillboardGui")
+    billboard.Size = UDim2.new(0, 150, 0, 30)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.Parent = marker
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = "📍 FAKE POSITION"
+    label.TextColor3 = Color3.fromRGB(0, 255, 0)
+    label.TextScaled = true
+    label.Font = Enum.Font.Bold
+    label.Parent = billboard
+    
+    local glow = Instance.new("PointLight")
+    glow.Parent = marker
+    glow.Color = Color3.fromRGB(0, 255, 0)
+    glow.Range = 10
+    glow.Brightness = 2
+    
+    game:GetService("Debris"):AddItem(marker, 30)
+    return marker
+end
+
+-- Marker an FAKE Position setzen
+createMarker(fakePosition)
+print("🟢 Marker an FAKE Position gesetzt!")
+
+-- ==============================
+-- STEP 4: DESYNC LÄUFT
+-- ==============================
+local desyncOffset = Vector3.new(0, 0, 0)
+local targetOffset = Vector3.new(0, 0, 0)
+
+RunService.Heartbeat:Connect(function()
+    if not rootPart or not rootPart.Parent then return end
+    
+    -- Zufälligen Desync-Offset generieren (2,0 Studs)
+    targetOffset = Vector3.new(
+        math.random(-200, 200) / 100,
+        math.random(-40, 40) / 100,
+        math.random(-200, 200) / 100
+    )
+    
+    -- Sanftes Gleiten
+    desyncOffset = desyncOffset:Lerp(targetOffset, 0.1)
+    
+    -- Position für andere Spieler verändern
+    rootPart.CFrame = rootPart.CFrame + desyncOffset
+end)
+
+-- ==============================
+-- POSITIONEN SPEICHERN
+-- ==============================
+local MAX_POSITIONS = 20
+local positions = {}
+local counter = 0
+
+RunService.Heartbeat:Connect(function()
+    if not rootPart or not rootPart.Parent then return end
+    
+    counter = counter + 1
+    if counter % 60 == 0 then
+        table.insert(positions, {
+            position = rootPart.Position,
+            cframe = rootPart.CFrame
+        })
+        
+        if #positions > MAX_POSITIONS then
+            table.remove(positions, 1)
+        end
+    end
+end)
+
+-- ==============================
+-- R TASTE = MARKER AN ALTER POSITION
+-- ==============================
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.R then
+        if #positions < 20 then
+            print("⚠️ Noch nicht genug Positionen (" .. #positions .. "/20)")
+            return
+        end
+        
+        local oldData = positions[1]
+        if oldData then
+            createMarker(oldData.position)
+            print("🟢 Marker an Position von vor 20 Sekunden")
+        end
+    end
+end)
+
+-- ==============================
+-- CHARACTER RESET
+-- ==============================
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    rootPart = character:WaitForChild("HumanoidRootPart")
+    desyncOffset = Vector3.new(0, 0, 0)
+    print("🔄 Character respawned - Desync läuft weiter")
+end)
+
+print("🧠 MUTAGEN STYLE GELADEN!")
+print("📌 Character wurde resetted!")
+print("📌 FAKE POSITION wurde markiert!")
+print("📌 Andere sehen dich an der FAKE POSITION!")
+print("📌 Drücke R = Marker an Position von vor 20 Sekunden")
+print("📌 KEINE Veränderungen an Speed oder Stats!")
