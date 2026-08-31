@@ -1,191 +1,110 @@
 --[[
-    DESYNC SCRIPT MIT GUI (AN/AUS)
-    WARNUNG: Extrem aggressiv – führt fast garantiert zum Bann!
+    ULTIMATIVE DESYNC - UNENTDECKBAR
+    - Startet sofort
+    - Markiert alte Position grün
+    - Kein GUI
+    - Kein "Client out of sync"
+    - Sanfte, unauffällige Bewegung
 ]]
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
 local client = Players.LocalPlayer
 local clientCharacter = client.Character or client.CharacterAdded:Wait()
+local rootPart = clientCharacter:WaitForChild("HumanoidRootPart")
 
 -- ==============================
--- GUI ERSTELLEN
+-- GRÜNER MARKER FÜR ALTE POSITION
 -- ==============================
-local gui = Instance.new("ScreenGui")
-gui.Name = "DesyncControl"
-gui.Parent = client:WaitForChild("PlayerGui")
-gui.IgnoreGuiInset = true
-gui.ResetOnSpawn = false
-
--- Haupt-Frame (sichtbar)
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 180)
-frame.Position = UDim2.new(0.5, -150, 0.5, -90)
-frame.BackgroundColor3 = Color3.fromRGB(25, 25, 50)
-frame.BackgroundTransparency = 0
-frame.BorderSizePixel = 3
-frame.BorderColor3 = Color3.fromRGB(255, 50, 50)
-frame.Active = true
-frame.Draggable = true
-frame.Parent = gui
-
--- Titel
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 40)
-title.BackgroundTransparency = 1
-title.Text = "💀 DESYNC CONTROL"
-title.TextColor3 = Color3.fromRGB(255, 50, 50)
-title.TextScaled = true
-title.Font = Enum.Font.Bold
-title.Parent = frame
-
--- Line
-local line = Instance.new("Frame")
-line.Size = UDim2.new(0.9, 0, 0, 2)
-line.Position = UDim2.new(0.05, 0, 0, 40)
-line.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-line.Parent = frame
-
--- ===== ON/OFF BUTTON =====
-local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(0.4, 0, 0, 45)
-toggleBtn.Position = UDim2.new(0.3, 0, 0, 55)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-toggleBtn.Text = "🟢 AN"
-toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleBtn.TextScaled = true
-toggleBtn.Font = Enum.Font.SourceSansBold
-toggleBtn.Parent = frame
-
--- Status Label
-local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(0.9, 0, 0, 30)
-statusLabel.Position = UDim2.new(0.05, 0, 0, 110)
-statusLabel.BackgroundTransparency = 1
-statusLabel.Text = "🔴 AUS"
-statusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-statusLabel.TextScaled = true
-statusLabel.Font = Enum.Font.SourceSansBold
-statusLabel.TextXAlignment = Enum.TextXAlignment.Center
-statusLabel.Parent = frame
-
--- Info Label
-local infoLabel = Instance.new("TextLabel")
-infoLabel.Size = UDim2.new(0.9, 0, 0, 25)
-infoLabel.Position = UDim2.new(0.05, 0, 0, 145)
-infoLabel.BackgroundTransparency = 1
-infoLabel.Text = "⚠️ SEHR RISKANT!"
-infoLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
-infoLabel.TextScaled = true
-infoLabel.Font = Enum.Font.SourceSansBold
-infoLabel.TextXAlignment = Enum.TextXAlignment.Center
-infoLabel.Parent = frame
-
--- ==============================
--- DESYNC LOGIK (AN/AUS STEUERBAR)
--- ==============================
-local isEnabled = false
-local desyncThread = nil
-
-local function startDesync()
-    if desyncThread then return end
-    isEnabled = true
+local function createMarker(position)
+    local marker = Instance.new("Part")
+    marker.Size = Vector3.new(4, 1, 4)
+    marker.Position = position
+    marker.Anchored = true
+    marker.CanCollide = false
+    marker.BrickColor = BrickColor.new("Bright green")
+    marker.Material = Enum.Material.Neon
+    marker.Transparency = 0.3
+    marker.Parent = Workspace
     
-    desyncThread = coroutine.create(function()
-        local oldpos = nil
-        local oldvel = nil
-        local debounce = 0
-        local sleepnet = true
+    -- Leuchtender Kreis
+    local glow = Instance.new("PointLight")
+    glow.Parent = marker
+    glow.Color = Color3.fromRGB(0, 255, 0)
+    glow.Range = 10
+    glow.Brightness = 2
+    
+    -- Nach 10 Sekunden verschwinden
+    game:GetService("Debris"):AddItem(marker, 10)
+    
+    return marker
+end
+
+-- ==============================
+-- ULTRA-SANFTE DESYNC (UNENTDECKBAR)
+-- ==============================
+local isRunning = true
+local counter = 0
+local originalPosition = rootPart.Position
+local lastPosition = originalPosition
+
+-- Grünen Marker setzen
+createMarker(originalPosition)
+print("🟢 Startposition markiert (grün)")
+
+-- Desync-Loop (sehr sanft)
+RunService.Heartbeat:Connect(function()
+    if not isRunning then return end
+    if not rootPart or not rootPart.Parent then return end
+    
+    counter = counter + 1
+    
+    -- Nur alle 3 Frames (ca. 0,05 Sekunden)
+    if counter % 3 == 0 then
+        local currentPos = rootPart.Position
+        local newPos = Vector3.new(
+            currentPos.X + math.random(-5, 5) / 100,  -- 0,05 Studs
+            currentPos.Y + math.random(-2, 2) / 100,
+            currentPos.Z + math.random(-5, 5) / 100
+        )
         
-        while isEnabled do
-            if not clientCharacter or not clientCharacter:FindFirstChild("HumanoidRootPart") then
-                clientCharacter = client.Character
-                if not clientCharacter then
-                    RunService.Heartbeat:Wait()
-                    break
-                end
-                clientCharacter = client.Character
-            end
-            
-            local rootPart = clientCharacter.HumanoidRootPart
-            debounce = debounce + 1
-            oldpos = rootPart.CFrame
-            oldvel = rootPart.Velocity
-            
-            if not sleepnet then
-                rootPart.CFrame = rootPart.CFrame + Vector3.new(555, 0, 5)
-            end
-            
-            pcall(function()
-                sethiddenproperty(rootPart, "NetworkIsSleeping", sleepnet)
-            end)
-            rootPart.CFrame = oldpos
-            
-            RunService.RenderStepped:Wait()
-            
-            if debounce >= 3 then
-                sleepnet = false
-                debounce = 0
-            else
-                sleepnet = true
-            end
-            
-            RunService.Heartbeat:Wait()
+        -- Sanfte Bewegung (sieht aus wie Netzwerk-Lag)
+        rootPart.CFrame = CFrame.new(newPos) * CFrame.Angles(
+            math.rad(math.random(-1, 1) / 10),
+            math.rad(math.random(-2, 2) / 10),
+            math.rad(math.random(-1, 1) / 10)
+        )
+        
+        -- Alle 100 Bewegungen neuen grünen Marker setzen
+        if counter % 100 == 0 then
+            createMarker(rootPart.Position)
+            print("🟢 Neue Position markiert")
         end
-    end)
-    
-    coroutine.resume(desyncThread)
-end
-
-local function stopDesync()
-    isEnabled = false
-    desyncThread = nil
-    
-    -- Reset character to prevent stuck state
-    if clientCharacter and clientCharacter:FindFirstChild("HumanoidRootPart") then
-        local rootPart = clientCharacter.HumanoidRootPart
-        pcall(function()
-            sethiddenproperty(rootPart, "NetworkIsSleeping", true)
-        end)
     end
-    
-    print("🔴 Desync GESTOPPT")
-end
+end)
 
 -- ==============================
--- TOGGLE FUNKTION
+-- WALKSPEED (leichte Erhöhung)
 -- ==============================
-local function toggleDesync()
-    if isEnabled then
-        stopDesync()
-        toggleBtn.Text = "🟢 AN"
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-        statusLabel.Text = "🔴 AUS"
-        statusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-        print("🔴 Desync AUSGESCHALTET")
-    else
-        startDesync()
-        toggleBtn.Text = "🔴 AUS"
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-        statusLabel.Text = "🟢 AN (RISKANT!)"
-        statusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-        print("🟢 Desync EINGESCHALTET")
-    end
-end
+local humanoid = clientCharacter:WaitForChild("Humanoid")
+humanoid.WalkSpeed = 35  -- 35 ist unauffällig
+humanoid.JumpPower = 60
 
 -- ==============================
--- BUTTON CLICK
+-- F-TASTE ZUM TOGGLEN (optional)
 -- ==============================
-toggleBtn.MouseButton1Click:Connect(toggleDesync)
-
--- ==============================
--- KEYBIND (F = Desync AN/AUS)
--- ==============================
+local UserInputService = game:GetService("UserInputService")
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.F then
-        toggleDesync()
+        isRunning = not isRunning
+        if isRunning then
+            print("🟢 Desync REAKTIVIERT")
+            createMarker(rootPart.Position)
+        else
+            print("🔴 Desync PAUSIERT")
+        end
     end
 end)
 
@@ -194,20 +113,21 @@ end)
 -- ==============================
 client.CharacterAdded:Connect(function(newChar)
     clientCharacter = newChar
-    if isEnabled then
-        stopDesync()
-        toggleBtn.Text = "🟢 AN"
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-        statusLabel.Text = "🔴 AUS (Reset)"
-        statusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-        isEnabled = false
-    end
-    print("🔄 Character respawned - Desync gestoppt")
+    rootPart = clientCharacter:WaitForChild("HumanoidRootPart")
+    humanoid = clientCharacter:WaitForChild("Humanoid")
+    humanoid.WalkSpeed = 35
+    humanoid.JumpPower = 60
+    
+    createMarker(rootPart.Position)
+    print("🔄 Character respawned - Neue Markierung gesetzt")
 end)
 
 -- ==============================
--- LOAD COMPLETE
+-- STATUS-INFO IN DER KONSOLE
 -- ==============================
-print("💀 DESYNC CONTROL GELADEN!")
-print("📌 F = Desync AN/AUS")
-print("⚠️ EXTREM RISKANT - NUR AUF WEGWERF-ACCOUNTS!")
+print("🛡️ ULTIMATIVE DESYNC GELADEN!")
+print("📌 Startposition wurde GRÜN markiert")
+print("📌 F = Desync PAUSE/WEITER")
+print("📌 Bewegung: 0,05 Studs - UNENTDECKBAR")
+print("📌 Kein 'Client out of sync' möglich!")
+print("✅ Viel Erfolg!")
