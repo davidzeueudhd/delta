@@ -1,8 +1,8 @@
 --[[
-    EXTREMER TEST: 250 STUDS DESYNC
+    EXTREMER TEST: 1000 STUDS DESYNC
     - Resetet den Character 1x
-    - Zeigt grünen Marker an Fake Position (250 Studs entfernt)
-    - Desync mit 250 Studs (ABSOLUT WAHNSINN)
+    - Zeigt grünen Marker an Fake Position (1000 Studs entfernt)
+    - Desync mit 1000 Studs (ABSOLUTER WAHNSINN)
     - WARNUNG: 100% BANN - NUR FÜR WEGWERF-ACCOUNTS!
 ]]
 
@@ -14,7 +14,7 @@ local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
-print("💀 250 STUDS - ABSOLUTER WAHNSINN STARTET...")
+print("💀 1000 STUDS - ABSOLUTER WAHNSINN STARTET...")
 
 -- ==============================
 -- RESET 1x
@@ -27,15 +27,15 @@ rootPart = character:WaitForChild("HumanoidRootPart")
 print("✅ Respawned!")
 
 -- ==============================
--- FAKE POSITION (250 STUDS)
+-- FAKE POSITION (1000 STUDS)
 -- ==============================
-local fakePos = rootPart.Position + Vector3.new(250, 25, 250)
+local fakePos = rootPart.Position + Vector3.new(1000, 100, 1000)
 
 -- ==============================
 -- GRÜNER MARKER (RIESIG)
 -- ==============================
 local marker = Instance.new("Part")
-marker.Size = Vector3.new(20, 3, 20)
+marker.Size = Vector3.new(50, 5, 50)
 marker.Position = fakePos
 marker.Anchored = true
 marker.CanCollide = false
@@ -46,14 +46,14 @@ marker.Parent = Workspace
 
 -- Text anzeigen
 local billboard = Instance.new("BillboardGui")
-billboard.Size = UDim2.new(0, 500, 0, 80)
-billboard.StudsOffset = Vector3.new(0, 8, 0)
+billboard.Size = UDim2.new(0, 800, 0, 120)
+billboard.StudsOffset = Vector3.new(0, 15, 0)
 billboard.Parent = marker
 
 local label = Instance.new("TextLabel")
 label.Size = UDim2.new(1, 0, 1, 0)
 label.BackgroundTransparency = 1
-label.Text = "🎯 250 STUDS FAKE POSITION"
+label.Text = "🎯 1000 STUDS FAKE POSITION"
 label.TextColor3 = Color3.fromRGB(0, 255, 0)
 label.TextScaled = true
 label.Font = Enum.Font.Bold
@@ -62,13 +62,13 @@ label.Parent = billboard
 local glow = Instance.new("PointLight")
 glow.Parent = marker
 glow.Color = Color3.fromRGB(0, 255, 0)
-glow.Range = 50
-glow.Brightness = 20
+glow.Range = 100
+glow.Brightness = 50
 
 print("🟢 Marker an FAKE Position: " .. tostring(fakePos))
 
 -- ==============================
--- DESYNC (250 STUDS)
+-- DESYNC (1000 STUDS)
 -- ==============================
 local offset = Vector3.new(0, 0, 0)
 
@@ -76,16 +76,16 @@ RunService.Heartbeat:Connect(function()
     if not rootPart or not rootPart.Parent then return end
     
     local target = Vector3.new(
-        math.random(-25000, 25000) / 100,  -- 250 Studs
-        math.random(-5000, 5000) / 100,
-        math.random(-25000, 25000) / 100
+        math.random(-100000, 100000) / 100,  -- 1000 Studs
+        math.random(-20000, 20000) / 100,
+        math.random(-100000, 100000) / 100
     )
     
     offset = offset:Lerp(target, 0.05)
     rootPart.CFrame = rootPart.CFrame + offset
 end)
 
-print("💀 250 STUDS DESYNC LÄUFT!")
-print("📌 Andere sollten dich 250 Studs versetzt sehen!")
+print("💀 1000 STUDS DESYNC LÄUFT!")
+print("📌 Andere sollten dich 1000 Studs versetzt sehen!")
 print("⚠️ 100% BANN - NUR AUF WEGWERF-ACCOUNTS!")
 print("⚠️ ROBLOX WIRD DICH SOFORT BANNEN!")
