@@ -1,8 +1,8 @@
 --[[
-    30 SEKUNDEN VERZÖGERUNG - OHNE RESET
-    - Kein Reset → Hooks bleiben stabil
-    - Speichert Positionen sofort
-    - Andere sehen dich 30 Sek. versetzt
+    30 SEKUNDEN VERZÖGERUNG - BEWEGBAR
+    - Du kannst dich normal bewegen
+    - Andere sehen dich 30 Sek. verzögert
+    - Kein Reset
 ]]
 
 local Players = game:GetService("Players")
@@ -14,10 +14,10 @@ local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
-print("⏳ 30 SEKUNDEN VERZÖGERUNG - OHNE RESET STARTET...")
+print("⏳ 30 SEKUNDEN VERZÖGERUNG - BEWEGBAR STARTET...")
 
 -- ==============================
--- POSITIONSSPEICHER (30 Sekunden)
+-- POSITIONSSPEICHER
 -- ==============================
 local MAX_POSITIONS = 30
 local positions = {}
@@ -44,7 +44,7 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ==============================
--- GRÜNER MARKER (Fake Position)
+-- GRÜNER MARKER
 -- ==============================
 local function createMarker(position, text)
     local marker = Instance.new("Part")
@@ -82,7 +82,7 @@ local function createMarker(position, text)
 end
 
 -- ==============================
--- HOOK 1: CFrame manipulieren
+-- HOOKS: NUR FÜR ANDERE, NICHT FÜR DICH!
 -- ==============================
 local hookCFrame = hookmetamethod(game, "__index", function(self, key)
     if not checkcaller() and key == "CFrame" and self == rootPart then
@@ -97,9 +97,6 @@ local hookCFrame = hookmetamethod(game, "__index", function(self, key)
     return hookCFrame(self, key)
 end)
 
--- ==============================
--- HOOK 2: Position manipulieren
--- ==============================
 local hookPosition = hookmetamethod(game, "__index", function(self, key)
     if not checkcaller() and key == "Position" and self == rootPart then
         if #positions >= 30 then
@@ -147,8 +144,8 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
-print("💀 30 SEKUNDEN VERZÖGERUNG - OHNE RESET LÄUFT!")
+print("💀 30 SEKUNDEN VERZÖGERUNG - BEWEGBAR LÄUFT!")
+print("📌 Du kannst dich normal bewegen!")
 print("📌 Andere sehen dich an der Position von vor 30 Sekunden!")
-print("📌 Du bewegst dich normal!")
 print("📌 Drücke R = Marker an 30-Sekunden-alter Position")
 print("⚠️ 100% BANN - NUR AUF WEGWERF-ACCOUNTS!")
