@@ -1,0 +1,147 @@
+--[[
+    KILL AURA - 100 STUDS - KEIN GUI
+    - Startet sofort
+    - Greift alle Gegner in 100 Studs an
+    - Lobby wird erkannt (kein Angriff)
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+-- ==============================
+-- LOBBY ERKENNUNG
+-- ==============================
+local function isInLobby()
+    -- Prüfe, ob bestimmte Lobby-Objekte existieren
+    local lobbyParts = {"Lobby", "Spawn", "Waiting", "Lounge"}
+    for _, name in ipairs(lobbyParts) do
+        if Workspace:FindFirstChild(name) then
+            return true
+        end
+    end
+    
+    -- Prüfe, ob der Spieler in der Lobby ist (z.B. keine Gegner)
+    local enemyCount = 0
+    for _, other in ipairs(Players:GetPlayers()) do
+        if other ~= player and other.Character then
+            enemyCount = enemyCount + 1
+        end
+    end
+    
+    if enemyCount == 0 then
+        return true
+    end
+    
+    return false
+end
+
+-- ==============================
+-- ANGRIFFS-REMOTE FINDEN
+-- ==============================
+local function findAttackRemote()
+    local remotes = {
+        game:GetService("ReplicatedStorage"):FindFirstChild("Attack"),
+        game:GetService("ReplicatedStorage"):FindFirstChild("Fire"),
+        game:GetService("ReplicatedStorage"):FindFirstChild("Shoot"),
+        game:GetService("ReplicatedStorage"):FindFirstChild("Damage"),
+        game:GetService("ReplicatedStorage"):FindFirstChild("RemoteEvent"),
+        game:GetService("ReplicatedStorage"):FindFirstChild("FireRemote"),
+    }
+    
+    for _, remote in ipairs(remotes) do
+        if remote then
+            return remote
+        end
+    end
+    
+    -- Suche in ReplicatedStorage nach Remote
+    for _, child in ipairs(game:GetService("ReplicatedStorage"):GetChildren()) do
+        if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
+            local name = child.Name:lower()
+            if name:find("attack") or name:find("fire") or name:find("shoot") or name:find("damage") then
+                return child
+            end
+        end
+    end
+    
+    return nil
+end
+
+local attackRemote = findAttackRemote()
+
+-- ==============================
+-- ANGRIFFSFUNKTION
+-- ==============================
+local function attackTarget(target)
+    if not target or not target.Character then return end
+    if target == player then return end
+    
+    local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+    if not targetRoot then return end
+    
+    -- Prüfe Distanz
+    local distance = (rootPart.Position - targetRoot.Position).Magnitude
+    if distance > 100 then return end
+    
+    -- Prüfe, ob der Gegner lebt
+    local humanoid = target.Character:FindFirstChild("Humanoid")
+    if not humanoid or humanoid.Health <= 0 then return end
+    
+    -- Angriff über Remote
+    if attackRemote then
+        pcall(function()
+            if attackRemote:IsA("RemoteEvent") then
+                attackRemote:FireServer(target)
+            elseif attackRemote:IsA("RemoteFunction") then
+                attackRemote:InvokeServer(target)
+            end
+        end)
+    else
+        -- Fallback: Klick simulieren
+        pcall(function()
+            local clickDetector = targetRoot:FindFirstChild("ClickDetector")
+            if clickDetector then
+                clickDetector:FireClick(player)
+            end
+        end)
+    end
+end
+
+-- ==============================
+-- KILL AURA LOOP
+-- ==============================
+local lobbyChecked = false
+local isLobby = false
+
+RunService.Heartbeat:Connect(function()
+    if not rootPart or not rootPart.Parent then return end
+    
+    -- Lobby nur einmal prüfen
+    if not lobbyChecked then
+        isLobby = isInLobby()
+        lobbyChecked = true
+    end
+    
+    if isLobby then return end
+    
+    -- Alle Gegner angreifen
+    for _, other in ipairs(Players:GetPlayers()) do
+        if other ~= player then
+            attackTarget(other)
+        end
+    end
+end)
+
+-- ==============================
+-- CHARACTER RESET
+-- ==============================
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    rootPart = character:WaitForChild("HumanoidRootPart")
+    lobbyChecked = false
+end)
