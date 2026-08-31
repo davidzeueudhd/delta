@@ -1,0 +1,117 @@
+--[[
+    TIME RESET + CLEAN DESYNC
+    - Kein Speed
+    - Kein Toggle
+    - Kein GUI
+    - Sanfter Desync (0,15 Studs)
+    - Grüne Marker an alter Position
+]]
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+-- ==============================
+-- CLEAN DESYNC (SANFT)
+-- ==============================
+RunService.Heartbeat:Connect(function()
+    if not rootPart or not rootPart.Parent then return end
+    
+    local currentPos = rootPart.Position
+    local newPos = Vector3.new(
+        currentPos.X + math.random(-15, 15) / 100,  -- 0,15 Studs
+        currentPos.Y + math.random(-3, 3) / 100,
+        currentPos.Z + math.random(-15, 15) / 100
+    )
+    
+    rootPart.CFrame = CFrame.new(newPos) * CFrame.Angles(
+        math.rad(math.random(-1, 1) / 10),
+        math.rad(math.random(-2, 2) / 10),
+        math.rad(math.random(-1, 1) / 10)
+    )
+end)
+
+-- ==============================
+-- POSITIONEN SPEICHERN
+-- ==============================
+local MAX_POSITIONS = 20
+local positions = {}
+local counter = 0
+
+RunService.Heartbeat:Connect(function()
+    if not rootPart or not rootPart.Parent then return end
+    
+    counter = counter + 1
+    if counter % 60 == 0 then
+        table.insert(positions, {
+            position = rootPart.Position,
+            cframe = rootPart.CFrame
+        })
+        
+        if #positions > MAX_POSITIONS then
+            table.remove(positions, 1)
+        end
+    end
+end)
+
+-- ==============================
+-- GRÜNER MARKER
+-- ==============================
+local function createMarker(position)
+    local marker = Instance.new("Part")
+    marker.Size = Vector3.new(5, 1, 5)
+    marker.Position = position
+    marker.Anchored = true
+    marker.CanCollide = false
+    marker.BrickColor = BrickColor.new("Bright green")
+    marker.Material = Enum.Material.Neon
+    marker.Transparency = 0.3
+    marker.Parent = Workspace
+    
+    local glow = Instance.new("PointLight")
+    glow.Parent = marker
+    glow.Color = Color3.fromRGB(0, 255, 0)
+    glow.Range = 10
+    glow.Brightness = 2
+    
+    game:GetService("Debris"):AddItem(marker, 10)
+    return marker
+end
+
+-- ==============================
+-- R TASTE = MARKER AN ALTER POSITION
+-- ==============================
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.R then
+        if #positions < 20 then
+            print("⚠️ Noch nicht genug Positionen (" .. #positions .. "/20)")
+            return
+        end
+        
+        local oldData = positions[1]
+        if oldData then
+            createMarker(oldData.position)
+            print("🟢 Marker an Position von vor 20 Sekunden")
+        end
+    end
+end)
+
+-- ==============================
+-- CHARACTER RESET
+-- ==============================
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    rootPart = character:WaitForChild("HumanoidRootPart")
+    print("🔄 Character respawned - Bereit")
+end)
+
+print("🟢 TIME RESET + DESYNC GELADEN!")
+print("📌 Desync: 0,15 Studs (sanft)")
+print("📌 Drücke R = Marker an Position von vor 20 Sekunden")
+print("📌 KEINE Veränderungen an Speed oder Stats!")
