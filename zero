@@ -1,19 +1,22 @@
 --[[
-    ECHTE MUTAGEN-METHODE
-    - Manipuliert die Server-Position
-    - Andere sehen dich woanders
-    - Du siehst dich normal
+    MAXIMALER DESYNC - ALLE METHODEN KOMBINIERT
+    - Hooks für CFrame + Position
+    - Zusätzliche Positionsverschiebung
+    - 500 Studs Versatz
+    - Sichtbar für andere
+    - WARNUNG: 100% BANN!
 ]]
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
-print("🧠 MUTAGEN-STYLE STARTET...")
+print("🔥 MAXIMALER DESYNC STARTET...")
 
 -- ==============================
 -- RESET 1x
@@ -26,22 +29,22 @@ rootPart = character:WaitForChild("HumanoidRootPart")
 print("✅ Respawned!")
 
 -- ==============================
--- GRÜNER MARKER (bei dir)
+-- GRÜNER MARKER (SUPER SICHTBAR)
 -- ==============================
 local function createMarker(position, text)
     local marker = Instance.new("Part")
-    marker.Size = Vector3.new(5, 1, 5)
+    marker.Size = Vector3.new(10, 2, 10)
     marker.Position = position
     marker.Anchored = true
     marker.CanCollide = false
     marker.BrickColor = BrickColor.new("Bright green")
     marker.Material = Enum.Material.Neon
-    marker.Transparency = 0.2
+    marker.Transparency = 0.1
     marker.Parent = Workspace
     
     local billboard = Instance.new("BillboardGui")
-    billboard.Size = UDim2.new(0, 200, 0, 40)
-    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.Size = UDim2.new(0, 400, 0, 60)
+    billboard.StudsOffset = Vector3.new(0, 5, 0)
     billboard.Parent = marker
     
     local label = Instance.new("TextLabel")
@@ -56,48 +59,67 @@ local function createMarker(position, text)
     local glow = Instance.new("PointLight")
     glow.Parent = marker
     glow.Color = Color3.fromRGB(0, 255, 0)
-    glow.Range = 15
-    glow.Brightness = 5
+    glow.Range = 30
+    glow.Brightness = 20
     
     game:GetService("Debris"):AddItem(marker, 30)
     return marker
 end
 
 -- ==============================
--- FAKE POSITION (100 STUDS)
+-- FAKE POSITION (500 STUDS)
 -- ==============================
-local fakePos = rootPart.Position + Vector3.new(100, 0, 100)
-createMarker(fakePos, "🎯 ANDERE SEHEN DICH HIER")
+local fakeOffset = Vector3.new(500, 50, 500)
+local fakePos = rootPart.Position + fakeOffset
+createMarker(fakePos, "🎯 ANDERE SEHEN DICH HIER (500 STUDS)")
 
 -- ==============================
--- ECHTE MUTAGEN-METHODE (HOOK)
+-- POSITION SPEICHERN
 -- ==============================
-local oldPosition = rootPart.Position
-local fakeOffset = Vector3.new(100, 0, 100)  -- 100 Studs Versatz
+local realPosition = rootPart.Position
 
--- Hook für CFrame
+-- ==============================
+-- HOOK 1: CFrame manipulieren
+-- ==============================
 local hookCFrame = hookmetamethod(game, "__index", function(self, key)
     if not checkcaller() and key == "CFrame" and self == rootPart then
-        return CFrame.new(oldPosition + fakeOffset)
+        return CFrame.new(realPosition + fakeOffset)
     end
     return hookCFrame(self, key)
 end)
 
--- Hook für Position
+-- ==============================
+-- HOOK 2: Position manipulieren
+-- ==============================
 local hookPosition = hookmetamethod(game, "__index", function(self, key)
     if not checkcaller() and key == "Position" and self == rootPart then
-        return oldPosition + fakeOffset
+        return realPosition + fakeOffset
     end
     return hookPosition(self, key)
 end)
 
--- Loop: Echte Position speichern und Fake senden
+-- ==============================
+-- ZUSÄTZLICHE POSITIONSVERSCHIEBUNG
+-- ==============================
+local desyncOffset = Vector3.new(0, 0, 0)
+
 RunService.Heartbeat:Connect(function()
     if not rootPart or not rootPart.Parent then return end
-    oldPosition = rootPart.Position
+    
+    -- Echte Position speichern
+    realPosition = rootPart.Position
+    
+    -- Zusätzliche sanfte Verschiebung (für andere sichtbar)
+    local target = Vector3.new(
+        math.random(-2000, 2000) / 100,
+        math.random(-200, 200) / 100,
+        math.random(-2000, 2000) / 100
+    )
+    desyncOffset = desyncOffset:Lerp(target, 0.2)
+    rootPart.CFrame = rootPart.CFrame + desyncOffset
 end)
 
-print("🔥 ECHTE MUTAGEN-METHODE LÄUFT!")
-print("📌 Andere sehen dich 100 Studs entfernt!")
-print("📌 Du siehst dich normal!")
-print("⚠️ EXTREM RISKANT!")
+print("💀 MAXIMALER DESYNC LÄUFT!")
+print("📌 Methoden: Hooks + Positionsverschiebung")
+print("📌 Andere sehen dich 500 Studs entfernt!")
+print("⚠️ 100% BANN - NUR AUF WEGWERF-ACCOUNTS!")
