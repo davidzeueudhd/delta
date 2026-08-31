@@ -1,10 +1,12 @@
-loadstring([[
-print("🥚 TELEPORT GUI GELADEN!")
+print("🥚 EGG TELEPORTER (MANUELL) GELADEN!")
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
+
+-- ========== GESPEICHERTE EIER ==========
+local SavedEggPosition = nil
 
 -- ========== TELEPORT FUNKTION ==========
 local function TeleportTo(pos)
@@ -16,29 +18,25 @@ local function TeleportTo(pos)
     return true
 end
 
--- ========== EIER FINDEN ==========
-local function FindNearestEgg()
+-- ========== EGG SETZEN ==========
+local function SetEgg()
     local char = LocalPlayer.Character
-    if not char then return nil end
+    if not char then return end
     local root = char:FindFirstChild("HumanoidRootPart")
-    if not root then return nil end
-    
-    local nearest = nil
-    local nearestDist = math.huge
-    
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("BasePart") then
-            local name = (obj.Name or ""):lower()
-            if name:find("egg") or name:find("nest") then
-                local dist = (obj.Position - root.Position).Magnitude
-                if dist < nearestDist then
-                    nearestDist = dist
-                    nearest = obj
-                end
-            end
-        end
+    if root then
+        SavedEggPosition = root.Position
+        print("🥚 Ei gespeichert bei: " .. tostring(SavedEggPosition))
     end
-    return nearest
+end
+
+-- ========== ZUM GESPEICHERTEN EI TELEPORTIEREN ==========
+local function TeleportToSavedEgg()
+    if not SavedEggPosition then
+        print("❌ Kein Ei gespeichert! Geh zu einem Ei und klick 'SET EGG'.")
+        return
+    end
+    TeleportTo(SavedEggPosition + Vector3.new(0, 2, 0))
+    print("✅ Zum gespeicherten Ei teleportiert!")
 end
 
 -- ========== BASE SYSTEM ==========
@@ -63,23 +61,6 @@ local function TeleportToBase()
     print("🏠 Zur Base teleportiert!")
 end
 
--- ========== TELEPORT ZU EGG ==========
-local function TeleportToEgg()
-    local egg = FindNearestEgg()
-    if not egg then
-        print("❌ Kein Ei gefunden!")
-        return
-    end
-    
-    print("🥚 Ei gefunden: " .. egg.Name)
-    local success = TeleportTo(egg.Position + Vector3.new(0, 2, 0))
-    
-    if success then
-        print("✅ Zum Ei teleportiert!")
-        print("📌 Klick das Ei jetzt manuell zum Einsammeln.")
-    end
-end
-
 -- ========== GUI ==========
 local function CreateGUI()
     local screenGui = Instance.new("ScreenGui")
@@ -88,8 +69,8 @@ local function CreateGUI()
     
     -- Hauptfenster
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 300, 0, 250)
-    frame.Position = UDim2.new(0.5, -150, 0.5, -125)
+    frame.Size = UDim2.new(0, 300, 0, 300)
+    frame.Position = UDim2.new(0.5, -150, 0.5, -150)
     frame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
     frame.BackgroundTransparency = 0.1
     frame.BorderSizePixel = 0
@@ -123,26 +104,42 @@ local function CreateGUI()
     status.Font = Enum.Font.GothamBold
     status.Parent = frame
     
-    -- TELEPORT ZU EGG
-    local tpBtn = Instance.new("TextButton")
-    tpBtn.Size = UDim2.new(0.8, 0, 0, 40)
-    tpBtn.Position = UDim2.new(0.1, 0, 0, 80)
-    tpBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-    tpBtn.Text = "🚀 ZU EIER"
-    tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    tpBtn.TextScaled = true
-    tpBtn.Font = Enum.Font.GothamBold
-    tpBtn.BorderSizePixel = 0
-    tpBtn.Parent = frame
+    -- SET EGG
+    local setEggBtn = Instance.new("TextButton")
+    setEggBtn.Size = UDim2.new(0.8, 0, 0, 35)
+    setEggBtn.Position = UDim2.new(0.1, 0, 0, 80)
+    setEggBtn.BackgroundColor3 = Color3.fromRGB(255, 200, 0)
+    setEggBtn.Text = "🥚 SET EGG"
+    setEggBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+    setEggBtn.TextScaled = true
+    setEggBtn.Font = Enum.Font.GothamBold
+    setEggBtn.BorderSizePixel = 0
+    setEggBtn.Parent = frame
     
     local btnCorner = Instance.new("UICorner")
     btnCorner.CornerRadius = UDim.new(0, 10)
-    btnCorner.Parent = tpBtn
+    btnCorner.Parent = setEggBtn
+    
+    -- TP TO EGG
+    local tpEggBtn = Instance.new("TextButton")
+    tpEggBtn.Size = UDim2.new(0.8, 0, 0, 35)
+    tpEggBtn.Position = UDim2.new(0.1, 0, 0, 125)
+    tpEggBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+    tpEggBtn.Text = "🚀 TP TO EGG"
+    tpEggBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tpEggBtn.TextScaled = true
+    tpEggBtn.Font = Enum.Font.GothamBold
+    tpEggBtn.BorderSizePixel = 0
+    tpEggBtn.Parent = frame
+    
+    local btnCorner2 = Instance.new("UICorner")
+    btnCorner2.CornerRadius = UDim.new(0, 10)
+    btnCorner2.Parent = tpEggBtn
     
     -- SET BASE
     local setBaseBtn = Instance.new("TextButton")
     setBaseBtn.Size = UDim2.new(0.38, 0, 0, 35)
-    setBaseBtn.Position = UDim2.new(0.06, 0, 0, 130)
+    setBaseBtn.Position = UDim2.new(0.06, 0, 0, 175)
     setBaseBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
     setBaseBtn.Text = "🏠 SET BASE"
     setBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -158,7 +155,7 @@ local function CreateGUI()
     -- TP TO BASE
     local tpBaseBtn = Instance.new("TextButton")
     tpBaseBtn.Size = UDim2.new(0.38, 0, 0, 35)
-    tpBaseBtn.Position = UDim2.new(0.56, 0, 0, 130)
+    tpBaseBtn.Position = UDim2.new(0.56, 0, 0, 175)
     tpBaseBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
     tpBaseBtn.Text = "🏠 TP BASE"
     tpBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -173,10 +170,10 @@ local function CreateGUI()
     
     -- Hilfe
     local help = Instance.new("TextLabel")
-    help.Size = UDim2.new(1, 0, 0, 25)
-    help.Position = UDim2.new(0, 0, 0, 180)
+    help.Size = UDim2.new(1, 0, 0, 30)
+    help.Position = UDim2.new(0, 0, 0, 225)
     help.BackgroundTransparency = 1
-    help.Text = "💡 Klicke Ei manuell zum Einsammeln"
+    help.Text = "1. Geh zu einem echten Ei\n2. Klick 'SET EGG'\n3. Klick 'TP TO EGG'"
     help.TextColor3 = Color3.fromRGB(150, 150, 150)
     help.TextScaled = true
     help.Font = Enum.Font.GothamMedium
@@ -204,10 +201,25 @@ local function CreateGUI()
     end)
     
     -- ========== BUTTON FUNKTIONEN ==========
-    tpBtn.MouseButton1Click:Connect(function()
-        status.Text = "⏳ Suche Ei..."
+    setEggBtn.MouseButton1Click:Connect(function()
+        SetEgg()
+        status.Text = "✅ Ei gespeichert!"
+        status.TextColor3 = Color3.fromRGB(0, 255, 100)
+        task.wait(2)
+        status.Text = "🟢 Bereit"
+    end)
+    
+    tpEggBtn.MouseButton1Click:Connect(function()
+        if not SavedEggPosition then
+            status.Text = "❌ Kein Ei gespeichert!"
+            status.TextColor3 = Color3.fromRGB(255, 0, 0)
+            task.wait(2)
+            status.Text = "🟢 Bereit"
+            return
+        end
+        status.Text = "⏳ Teleportiere..."
         status.TextColor3 = Color3.fromRGB(255, 200, 0)
-        TeleportToEgg()
+        TeleportToSavedEgg()
         status.Text = "✅ Teleportiert!"
         status.TextColor3 = Color3.fromRGB(0, 255, 100)
         task.wait(2)
@@ -256,6 +268,5 @@ CreateGUI()
 
 print("🥚 TELEPORT GUI GELADEN!")
 print("📌 Drücke R zum ein-/ausblenden")
-print("🚀 Klick 'ZU EIER' zum Teleportieren")
-print("🏠 Klick 'SET BASE' und 'TP BASE' für Base")
-]])()
+print("🥚 Geh zu einem echten Ei und klick 'SET EGG'")
+print("🚀 Dann klick 'TP TO EGG' - es teleportiert NUR zu diesem Ei!")
