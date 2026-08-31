@@ -1,21 +1,22 @@
-print("🥚 WORKING EGG TELEPORT LOADED!")
+loadstring([[
+print("🥚 TELEPORT GUI GELADEN!")
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
--- Teleport function
+-- ========== TELEPORT FUNKTION ==========
 local function TeleportTo(pos)
     local char = LocalPlayer.Character
-    if not char then return end
+    if not char then return false end
     local root = char:FindFirstChild("HumanoidRootPart")
-    if root then
-        root.CFrame = CFrame.new(pos)
-        print("✅ Teleported!")
-    end
+    if not root then return false end
+    root.CFrame = CFrame.new(pos)
+    return true
 end
 
--- Find nearest egg
+-- ========== EIER FINDEN ==========
 local function FindNearestEgg()
     local char = LocalPlayer.Character
     if not char then return nil end
@@ -40,18 +41,221 @@ local function FindNearestEgg()
     return nearest
 end
 
--- Press T to teleport
-game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.T then
-        local egg = FindNearestEgg()
-        if egg then
-            print("🥚 Found: " .. egg.Name)
-            TeleportTo(egg.Position + Vector3.new(0, 2, 0))
-        else
-            print("❌ No eggs found!")
-        end
-    end
-end)
+-- ========== BASE SYSTEM ==========
+local MyBase = nil
 
-print("📌 Press T to teleport to the nearest egg!")
+local function SetBase()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if root then
+        MyBase = root.Position
+        print("🏠 Base gesetzt bei: " .. tostring(MyBase))
+    end
+end
+
+local function TeleportToBase()
+    if not MyBase then
+        print("❌ Base nicht gesetzt! Klick 'SET BASE' zuerst.")
+        return
+    end
+    TeleportTo(MyBase + Vector3.new(0, 2, 0))
+    print("🏠 Zur Base teleportiert!")
+end
+
+-- ========== TELEPORT ZU EGG ==========
+local function TeleportToEgg()
+    local egg = FindNearestEgg()
+    if not egg then
+        print("❌ Kein Ei gefunden!")
+        return
+    end
+    
+    print("🥚 Ei gefunden: " .. egg.Name)
+    local success = TeleportTo(egg.Position + Vector3.new(0, 2, 0))
+    
+    if success then
+        print("✅ Zum Ei teleportiert!")
+        print("📌 Klick das Ei jetzt manuell zum Einsammeln.")
+    end
+end
+
+-- ========== GUI ==========
+local function CreateGUI()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "EggTeleporter"
+    screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    
+    -- Hauptfenster
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 300, 0, 250)
+    frame.Position = UDim2.new(0.5, -150, 0.5, -125)
+    frame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+    frame.BackgroundTransparency = 0.1
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.Draggable = true
+    frame.Parent = screenGui
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = frame
+    
+    -- Titel
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.BackgroundColor3 = Color3.fromRGB(255, 180, 50)
+    title.BackgroundTransparency = 0.3
+    title.Text = "🥚 EGG TELEPORTER"
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.TextScaled = true
+    title.Font = Enum.Font.GothamBold
+    title.Parent = frame
+    
+    -- Status
+    local status = Instance.new("TextLabel")
+    status.Size = UDim2.new(1, 0, 0, 25)
+    status.Position = UDim2.new(0, 0, 0, 45)
+    status.BackgroundTransparency = 1
+    status.Text = "🟢 Bereit"
+    status.TextColor3 = Color3.fromRGB(0, 255, 100)
+    status.TextScaled = true
+    status.Font = Enum.Font.GothamBold
+    status.Parent = frame
+    
+    -- TELEPORT ZU EGG
+    local tpBtn = Instance.new("TextButton")
+    tpBtn.Size = UDim2.new(0.8, 0, 0, 40)
+    tpBtn.Position = UDim2.new(0.1, 0, 0, 80)
+    tpBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+    tpBtn.Text = "🚀 ZU EIER"
+    tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tpBtn.TextScaled = true
+    tpBtn.Font = Enum.Font.GothamBold
+    tpBtn.BorderSizePixel = 0
+    tpBtn.Parent = frame
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 10)
+    btnCorner.Parent = tpBtn
+    
+    -- SET BASE
+    local setBaseBtn = Instance.new("TextButton")
+    setBaseBtn.Size = UDim2.new(0.38, 0, 0, 35)
+    setBaseBtn.Position = UDim2.new(0.06, 0, 0, 130)
+    setBaseBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+    setBaseBtn.Text = "🏠 SET BASE"
+    setBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    setBaseBtn.TextScaled = true
+    setBaseBtn.Font = Enum.Font.GothamBold
+    setBaseBtn.BorderSizePixel = 0
+    setBaseBtn.Parent = frame
+    
+    local baseCorner = Instance.new("UICorner")
+    baseCorner.CornerRadius = UDim.new(0, 8)
+    baseCorner.Parent = setBaseBtn
+    
+    -- TP TO BASE
+    local tpBaseBtn = Instance.new("TextButton")
+    tpBaseBtn.Size = UDim2.new(0.38, 0, 0, 35)
+    tpBaseBtn.Position = UDim2.new(0.56, 0, 0, 130)
+    tpBaseBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+    tpBaseBtn.Text = "🏠 TP BASE"
+    tpBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tpBaseBtn.TextScaled = true
+    tpBaseBtn.Font = Enum.Font.GothamBold
+    tpBaseBtn.BorderSizePixel = 0
+    tpBaseBtn.Parent = frame
+    
+    local tpBaseCorner = Instance.new("UICorner")
+    tpBaseCorner.CornerRadius = UDim.new(0, 8)
+    tpBaseCorner.Parent = tpBaseBtn
+    
+    -- Hilfe
+    local help = Instance.new("TextLabel")
+    help.Size = UDim2.new(1, 0, 0, 25)
+    help.Position = UDim2.new(0, 0, 0, 180)
+    help.BackgroundTransparency = 1
+    help.Text = "💡 Klicke Ei manuell zum Einsammeln"
+    help.TextColor3 = Color3.fromRGB(150, 150, 150)
+    help.TextScaled = true
+    help.Font = Enum.Font.GothamMedium
+    help.Parent = frame
+    
+    -- Close
+    local close = Instance.new("TextButton")
+    close.Size = UDim2.new(0, 30, 0, 30)
+    close.Position = UDim2.new(1, -40, 0, 5)
+    close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    close.Text = "✕"
+    close.TextColor3 = Color3.fromRGB(255, 255, 255)
+    close.TextScaled = true
+    close.Font = Enum.Font.GothamBold
+    close.BorderSizePixel = 0
+    close.Parent = frame
+    
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 8)
+    closeCorner.Parent = close
+    
+    close.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
+        print("❌ GUI geschlossen!")
+    end)
+    
+    -- ========== BUTTON FUNKTIONEN ==========
+    tpBtn.MouseButton1Click:Connect(function()
+        status.Text = "⏳ Suche Ei..."
+        status.TextColor3 = Color3.fromRGB(255, 200, 0)
+        TeleportToEgg()
+        status.Text = "✅ Teleportiert!"
+        status.TextColor3 = Color3.fromRGB(0, 255, 100)
+        task.wait(2)
+        status.Text = "🟢 Bereit"
+    end)
+    
+    setBaseBtn.MouseButton1Click:Connect(function()
+        SetBase()
+        status.Text = "✅ Base gesetzt!"
+        status.TextColor3 = Color3.fromRGB(0, 255, 100)
+        task.wait(2)
+        status.Text = "🟢 Bereit"
+    end)
+    
+    tpBaseBtn.MouseButton1Click:Connect(function()
+        if not MyBase then
+            status.Text = "❌ Setze Base zuerst!"
+            status.TextColor3 = Color3.fromRGB(255, 0, 0)
+            task.wait(2)
+            status.Text = "🟢 Bereit"
+            return
+        end
+        status.Text = "⏳ Teleportiere..."
+        status.TextColor3 = Color3.fromRGB(255, 200, 0)
+        TeleportToBase()
+        status.Text = "✅ Zur Base!"
+        status.TextColor3 = Color3.fromRGB(0, 255, 100)
+        task.wait(2)
+        status.Text = "🟢 Bereit"
+    end)
+    
+    -- Toggle mit R
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == Enum.KeyCode.R then
+            frame.Visible = not frame.Visible
+        end
+    end)
+    
+    print("✅ GUI geladen! Drücke R zum ein-/ausblenden.")
+end
+
+-- ========== START ==========
+task.wait(0.5)
+CreateGUI()
+
+print("🥚 TELEPORT GUI GELADEN!")
+print("📌 Drücke R zum ein-/ausblenden")
+print("🚀 Klick 'ZU EIER' zum Teleportieren")
+print("🏠 Klick 'SET BASE' und 'TP BASE' für Base")
+]])()
