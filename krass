@@ -1,0 +1,124 @@
+--[[
+    DESYNC STARK - SPEED LANGSAM
+    - Desync: 0,6 Studs (SEHR STARK)
+    - Frequenz: Alle 2 Frames
+    - WalkSpeed: 25 (LANGSAM)
+    - JumpPower: 50 (LANGSAM)
+    - Sehr starke Rotation
+    - Grüne Marker
+    - WARNUNG: EXTREM RISKANT!
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local client = Players.LocalPlayer
+local clientCharacter = client.Character or client.CharacterAdded:Wait()
+local rootPart = clientCharacter:WaitForChild("HumanoidRootPart")
+
+-- ==============================
+-- GRÜNER MARKER
+-- ==============================
+local function createMarker(position)
+    local marker = Instance.new("Part")
+    marker.Size = Vector3.new(3, 0.5, 3)
+    marker.Position = position
+    marker.Anchored = true
+    marker.CanCollide = false
+    marker.BrickColor = BrickColor.new("Bright green")
+    marker.Material = Enum.Material.Neon
+    marker.Transparency = 0.4
+    marker.Parent = Workspace
+    
+    local glow = Instance.new("PointLight")
+    glow.Parent = marker
+    glow.Color = Color3.fromRGB(0, 255, 0)
+    glow.Range = 8
+    glow.Brightness = 1.5
+    
+    game:GetService("Debris"):AddItem(marker, 15)
+    return marker
+end
+
+-- ==============================
+-- DESYNC SEHR STARK (0,6 Studs)
+-- ==============================
+local isRunning = true
+local counter = 0
+local originalPosition = rootPart.Position
+
+createMarker(originalPosition)
+print("🟢 Startposition markiert")
+
+-- Desync-Loop (ALLE 2 FRAMES)
+RunService.Heartbeat:Connect(function()
+    if not isRunning then return end
+    if not rootPart or not rootPart.Parent then return end
+    
+    counter = counter + 1
+    
+    -- ALLE 2 FRAMES
+    if counter % 2 == 0 then
+        local currentPos = rootPart.Position
+        local newPos = Vector3.new(
+            currentPos.X + math.random(-60, 60) / 100,  -- 0,6 Studs
+            currentPos.Y + math.random(-12, 12) / 100,
+            currentPos.Z + math.random(-60, 60) / 100
+        )
+        
+        -- SEHR STARKE ROTATION
+        rootPart.CFrame = CFrame.new(newPos) * CFrame.Angles(
+            math.rad(math.random(-5, 5) / 10),
+            math.rad(math.random(-10, 10) / 10),
+            math.rad(math.random(-5, 5) / 10)
+        )
+        
+        -- Alle 15 Bewegungen neuer Marker
+        if counter % 15 == 0 then
+            createMarker(rootPart.Position)
+        end
+    end
+end)
+
+-- ==============================
+-- SPEED LANGSAM (NORMAL!)
+-- ==============================
+local humanoid = clientCharacter:WaitForChild("Humanoid")
+humanoid.WalkSpeed = 25  -- LANGSAM
+humanoid.JumpPower = 50  -- LANGSAM
+
+-- ==============================
+-- F-TASTE ZUM TOGGLEN
+-- ==============================
+local UserInputService = game:GetService("UserInputService")
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.F then
+        isRunning = not isRunning
+        if isRunning then
+            print("🟢 Desync REAKTIVIERT")
+            createMarker(rootPart.Position)
+        else
+            print("🔴 Desync PAUSIERT")
+        end
+    end
+end)
+
+-- ==============================
+-- CHARACTER RESET
+-- ==============================
+client.CharacterAdded:Connect(function(newChar)
+    clientCharacter = newChar
+    rootPart = clientCharacter:WaitForChild("HumanoidRootPart")
+    humanoid = clientCharacter:WaitForChild("Humanoid")
+    humanoid.WalkSpeed = 25  -- LANGSAM
+    humanoid.JumpPower = 50  -- LANGSAM
+    createMarker(rootPart.Position)
+end)
+
+print("🔥 DESYNC EXTREM - SPEED LANGSAM GELADEN!")
+print("📌 Desync: 0,6 Studs - SEHR STARK")
+print("📌 WalkSpeed: 25 (LANGSAM)")
+print("📌 F = PAUSE/WEITER")
+print("🟢 GRÜNE MARKER AKTIV")
+print("⚠️ EXTREM RISKANT - NUR AUF WEGWERF-ACCOUNTS!")
