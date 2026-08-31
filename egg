@@ -7,6 +7,7 @@ local LocalPlayer = Players.LocalPlayer
 
 -- ========== YOUR BASE POSITION ==========
 local MyBasePosition = nil
+local BaseMarker = nil
 
 -- ========== FUNCTIONS ==========
 local function GetRoot()
@@ -15,21 +16,67 @@ local function GetRoot()
     return char:FindFirstChild("HumanoidRootPart")
 end
 
--- ========== SET BASE ==========
+-- ========== SET BASE WITH GLOWING MARKER ==========
 local function SetBase()
     local root = GetRoot()
     if not root then
         print("❌ No character found!")
         return
     end
+    
     MyBasePosition = root.Position
-    print("🏠 Base set at: " .. tostring(MyBasePosition))
+    
+    -- Remove old marker if exists
+    if BaseMarker then
+        BaseMarker:Destroy()
+        BaseMarker = nil
+    end
+    
+    -- Create glowing marker at base
+    local marker = Instance.new("Part")
+    marker.Name = "BaseMarker"
+    marker.Size = Vector3.new(5, 1, 5)
+    marker.Position = MyBasePosition
+    marker.Anchored = true
+    marker.CanCollide = false
+    marker.Transparency = 0.3
+    marker.Color = Color3.fromRGB(0, 255, 100)
+    marker.Material = Enum.Material.Neon
+    marker.Parent = Workspace
+    
+    -- Add glow
+    local glow = Instance.new("PointLight")
+    glow.Color = Color3.fromRGB(0, 255, 100)
+    glow.Brightness = 5
+    glow.Range = 20
+    glow.Parent = marker
+    
+    -- Add text label
+    local billboard = Instance.new("BillboardGui")
+    billboard.Size = UDim2.new(0, 100, 0, 30)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = marker
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = "🏠 YOUR BASE"
+    label.TextColor3 = Color3.fromRGB(0, 255, 100)
+    label.TextScaled = true
+    label.Font = Enum.Font.GothamBold
+    label.Parent = billboard
+    
+    BaseMarker = marker
+    
+    print("🏠 Base set with glowing marker!")
+    print("📍 Marker at: " .. tostring(MyBasePosition))
 end
 
 -- ========== TELEPORT TO BASE ==========
 local function TeleportToBase()
     if not MyBasePosition then
-        print("❌ Base not set! Click 'Set Base' first.")
+        print("❌ Base not set! Click 'SET BASE' first.")
         return
     end
     
@@ -40,28 +87,63 @@ local function TeleportToBase()
     print("🏠 Teleported to YOUR base!")
 end
 
--- ========== FIND BEST EGG ==========
+-- ========== FAST EGG FINDER (Only nests/eggs near players) ==========
 local function GetBestEgg()
     local bestEgg = nil
     local highestValue = -math.huge
+    local root = GetRoot()
+    if not root then return nil end
+    
+    -- Only scan eggs within 500 studs (faster)
+    local scanRadius = 500
     
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("BasePart") or obj:IsA("Model") then
             local name = (obj.Name or ""):lower()
-            if name:find("egg") then
-                local value = 0
-                local valueTag = obj:FindFirstChild("Value")
-                if valueTag and valueTag:IsA("IntValue") then
-                    value = valueTag.Value
-                end
-                
-                if value > highestValue then
-                    highestValue = value
-                    bestEgg = obj
+            -- Check if it's an egg AND near player
+            if name:find("egg") or name:find("nest") then
+                local pos = obj:IsA("BasePart") and obj.Position or nil
+                if pos then
+                    local dist = (pos - root.Position).Magnitude
+                    if dist < scanRadius then
+                        local value = 0
+                        local valueTag = obj:FindFirstChild("Value")
+                        if valueTag and valueTag:IsA("IntValue") then
+                            value = valueTag.Value
+                        end
+                        
+                        if value > highestValue then
+                            highestValue = value
+                            bestEgg = obj
+                        end
+                    end
                 end
             end
         end
     end
+    
+    -- If no eggs found in range, scan ALL eggs (slower fallback)
+    if not bestEgg then
+        print("🔍 No eggs nearby, scanning all...")
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("BasePart") or obj:IsA("Model") then
+                local name = (obj.Name or ""):lower()
+                if name:find("egg") then
+                    local value = 0
+                    local valueTag = obj:FindFirstChild("Value")
+                    if valueTag and valueTag:IsA("IntValue") then
+                        value = valueTag.Value
+                    end
+                    
+                    if value > highestValue then
+                        highestValue = value
+                        bestEgg = obj
+                    end
+                end
+            end
+        end
+    end
+    
     return bestEgg, highestValue
 end
 
@@ -72,11 +154,11 @@ local function TeleportToBestEgg()
     
     local egg, value = GetBestEgg()
     if not egg or not egg:IsA("BasePart") then
-        print("❌ No valuable egg found!")
+        print("❌ No eggs found!")
         return
     end
     
-    print("🥚 Best egg: " .. egg.Name .. " (Value: " .. tostring(value) .. ")")
+    print("🥚 Best nearby egg: " .. egg.Name .. " (Value: " .. tostring(value) .. ")")
     root.CFrame = CFrame.new(egg.Position + Vector3.new(0, 2, 0))
     task.wait(0.2)
     
@@ -119,7 +201,7 @@ local function CreateGUI()
     title.Size = UDim2.new(1, 0, 0, 35)
     title.BackgroundColor3 = Color3.fromRGB(255, 180, 50)
     title.BackgroundTransparency = 0.3
-    title.Text = "🥚 BEST EGG STEALER"
+    title.Text = "🥚 FAST EGG STEALER"
     title.TextColor3 = Color3.fromRGB(255, 255, 255)
     title.TextScaled = true
     title.Font = Enum.Font.GothamBold
@@ -280,8 +362,8 @@ end
 
 task.wait(0.5)
 CreateGUI()
-print("🥚 BEST EGG STEALER LOADED!")
+print("🥚 FAST EGG STEALER LOADED!")
 print("📌 Press R to toggle menu")
-print("🏠 Click 'SET BASE' at YOUR base first!")
-print("🚀 Then click 'BEST EGG' to teleport and steal!")
+print("🏠 Click 'SET BASE' at YOUR base - green glowing marker appears!")
+print("🚀 Click 'BEST EGG' to find and steal the best nearby egg!")
 ]])()
