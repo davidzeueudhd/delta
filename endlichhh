@@ -1,10 +1,10 @@
 --[[
-    STARKER DESYNC - ANDERE SEHEN DICH WOANDERS
-    - Desync: 2,0 Studs (deutlich sichtbar für andere)
+    DESYNC - BEWEGBAR + ANDERE SEHEN DICH WOANDERS
+    - Du kannst dich normal bewegen
+    - Andere sehen dich an anderer Position
     - Kein Speed
     - Kein Toggle
-    - Kein GUI
-    - R-Taste = Marker an alter Position
+    - R-Taste = Marker
 ]]
 
 local Players = game:GetService("Players")
@@ -17,27 +17,31 @@ local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
 -- ==============================
--- STARKER DESYNC (2,0 STUDS)
+-- DESYNC (NUR FÜR ANDERE SICHTBAR)
 -- ==============================
+local desyncOffset = Vector3.new(0, 0, 0)
+local targetOffset = Vector3.new(0, 0, 0)
+
+-- Sanftes Gleiten zum Ziel-Offset
 RunService.Heartbeat:Connect(function()
     if not rootPart or not rootPart.Parent then return end
     
-    local currentPos = rootPart.Position
-    local newPos = Vector3.new(
-        currentPos.X + math.random(-200, 200) / 100,  -- 2,0 Studs
-        currentPos.Y + math.random(-40, 40) / 100,
-        currentPos.Z + math.random(-200, 200) / 100
+    -- Neues Ziel-Offset (zufällig)
+    targetOffset = Vector3.new(
+        math.random(-200, 200) / 100,  -- 2,0 Studs
+        math.random(-40, 40) / 100,
+        math.random(-200, 200) / 100
     )
     
-    rootPart.CFrame = CFrame.new(newPos) * CFrame.Angles(
-        math.rad(math.random(-3, 3) / 10),
-        math.rad(math.random(-6, 6) / 10),
-        math.rad(math.random(-3, 3) / 10)
-    )
+    -- Sanftes Gleiten zum Ziel (nicht ruckartig)
+    desyncOffset = desyncOffset:Lerp(targetOffset, 0.1)
+    
+    -- Position für andere Spieler verändern (ohne deine Bewegung zu blockieren)
+    rootPart.CFrame = rootPart.CFrame + desyncOffset
 end)
 
 -- ==============================
--- POSITIONEN SPEICHERN (für Marker)
+-- POSITIONEN SPEICHERN
 -- ==============================
 local MAX_POSITIONS = 20
 local positions = {}
@@ -84,7 +88,7 @@ local function createMarker(position)
 end
 
 -- ==============================
--- R TASTE = MARKER AN ALTER POSITION
+-- R TASTE = MARKER
 -- ==============================
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
@@ -108,10 +112,11 @@ end)
 player.CharacterAdded:Connect(function(newChar)
     character = newChar
     rootPart = character:WaitForChild("HumanoidRootPart")
+    desyncOffset = Vector3.new(0, 0, 0)
     print("🔄 Character respawned - Bereit")
 end)
 
-print("🔥 STARKER DESYNC GELADEN!")
-print("📌 Andere sehen dich an anderer Position (2,0 Studs)")
+print("🎯 DESYNC GELADEN - DU KANNST DICH BEWEGEN!")
+print("📌 Andere sehen dich an anderer Position")
 print("📌 Drücke R = Marker an Position von vor 20 Sekunden")
 print("📌 KEINE Veränderungen an Speed oder Stats!")
