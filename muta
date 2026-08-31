@@ -1,20 +1,19 @@
 --[[
-    EXTREMER DESYNC - HARTE TELEPORTATION
-    - Kein Gleiten, keine Sanftheit
-    - Direkte Positionsänderung
-    - 1000 Studs Versatz
-    - WARNUNG: 100% BANN!
+    ECHTE MUTAGEN-METHODE
+    - Manipuliert die Server-Position
+    - Andere sehen dich woanders
+    - Du siehst dich normal
 ]]
 
 local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
-print("🔥 EXTREMER DESYNC STARTET...")
+print("🧠 MUTAGEN-STYLE STARTET...")
 
 -- ==============================
 -- RESET 1x
@@ -57,43 +56,48 @@ local function createMarker(position, text)
     local glow = Instance.new("PointLight")
     glow.Parent = marker
     glow.Color = Color3.fromRGB(0, 255, 0)
-    glow.Range = 20
-    glow.Brightness = 10
+    glow.Range = 15
+    glow.Brightness = 5
     
     game:GetService("Debris"):AddItem(marker, 30)
-    print("🟢 Marker gesetzt an: " .. tostring(position))
     return marker
 end
 
 -- ==============================
--- FAKE POSITION (1000 STUDS)
+-- FAKE POSITION (100 STUDS)
 -- ==============================
-local fakePos = rootPart.Position + Vector3.new(1000, 50, 1000)
+local fakePos = rootPart.Position + Vector3.new(100, 0, 100)
+createMarker(fakePos, "🎯 ANDERE SEHEN DICH HIER")
 
 -- ==============================
--- MARKER AN FAKE POSITION
+-- ECHTE MUTAGEN-METHODE (HOOK)
 -- ==============================
-createMarker(fakePos, "🎯 ANDERE SEHEN DICH HIER (1000 STUDS)")
-print("🟢 Marker an Fake Position: " .. tostring(fakePos))
+local oldPosition = rootPart.Position
+local fakeOffset = Vector3.new(100, 0, 100)  -- 100 Studs Versatz
 
--- ==============================
--- EXTREMER DESYNC (HART)
--- ==============================
-RunService.Heartbeat:Connect(function()
-    if not rootPart or not rootPart.Parent then return end
-    
-    -- DIREKTE Positionsänderung – KEIN Gleiten!
-    local offset = Vector3.new(
-        math.random(-100000, 100000) / 100,  -- 1000 Studs
-        math.random(-5000, 5000) / 100,
-        math.random(-100000, 100000) / 100
-    )
-    
-    -- Harte Teleportation
-    rootPart.CFrame = rootPart.CFrame + offset
+-- Hook für CFrame
+local hookCFrame = hookmetamethod(game, "__index", function(self, key)
+    if not checkcaller() and key == "CFrame" and self == rootPart then
+        return CFrame.new(oldPosition + fakeOffset)
+    end
+    return hookCFrame(self, key)
 end)
 
-print("💀 EXTREMER DESYNC LÄUFT!")
-print("📌 Andere sehen dich 1000 Studs entfernt!")
-print("📌 KEIN Gleiten – HARTE Teleportation!")
-print("⚠️ 100% BANN - NUR AUF WEGWERF-ACCOUNTS!")
+-- Hook für Position
+local hookPosition = hookmetamethod(game, "__index", function(self, key)
+    if not checkcaller() and key == "Position" and self == rootPart then
+        return oldPosition + fakeOffset
+    end
+    return hookPosition(self, key)
+end)
+
+-- Loop: Echte Position speichern und Fake senden
+RunService.Heartbeat:Connect(function()
+    if not rootPart or not rootPart.Parent then return end
+    oldPosition = rootPart.Position
+end)
+
+print("🔥 ECHTE MUTAGEN-METHODE LÄUFT!")
+print("📌 Andere sehen dich 100 Studs entfernt!")
+print("📌 Du siehst dich normal!")
+print("⚠️ EXTREM RISKANT!")
