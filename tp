@@ -1,9 +1,8 @@
 --[[
-    EXTREMER TEST: 1.000.000 STUDS DESYNC
-    - Resetet den Character 1x
-    - Zeigt grünen Marker bei dir und an Fake Position
-    - Desync mit 1.000.000 Studs (KOMPLETTER WAHNSINN)
-    - WARNUNG: 100% BANN + CRASH - NUR FÜR WEGWERF-ACCOUNTS!
+    ULTIMATIVE TEST: Character wird für andere sichtbar teleportiert
+    - Dein Character wird für andere an eine andere Position gesetzt
+    - Du siehst dich selbst normal
+    - Andere sehen dich an der FAKE Position
 ]]
 
 local Players = game:GetService("Players")
@@ -14,7 +13,7 @@ local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
-print("💀 1.000.000 STUDS - KOMPLETTER WAHNSINN STARTET...")
+print("🔥 ULTIMATIVE TEST STARTET...")
 
 -- ==============================
 -- RESET 1x
@@ -27,11 +26,11 @@ rootPart = character:WaitForChild("HumanoidRootPart")
 print("✅ Respawned!")
 
 -- ==============================
--- GRÜNER MARKER (SICHTBAR!)
+-- GRÜNER MARKER (bei dir)
 -- ==============================
 local function createMarker(position, text)
     local marker = Instance.new("Part")
-    marker.Size = Vector3.new(10, 2, 10)
+    marker.Size = Vector3.new(5, 1, 5)
     marker.Position = position
     marker.Anchored = true
     marker.CanCollide = false
@@ -41,14 +40,14 @@ local function createMarker(position, text)
     marker.Parent = Workspace
     
     local billboard = Instance.new("BillboardGui")
-    billboard.Size = UDim2.new(0, 300, 0, 50)
-    billboard.StudsOffset = Vector3.new(0, 5, 0)
+    billboard.Size = UDim2.new(0, 200, 0, 40)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
     billboard.Parent = marker
     
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
-    label.Text = text or "📍 FAKE POSITION"
+    label.Text = text or "📍 POSITION"
     label.TextColor3 = Color3.fromRGB(0, 255, 0)
     label.TextScaled = true
     label.Font = Enum.Font.Bold
@@ -57,8 +56,8 @@ local function createMarker(position, text)
     local glow = Instance.new("PointLight")
     glow.Parent = marker
     glow.Color = Color3.fromRGB(0, 255, 0)
-    glow.Range = 30
-    glow.Brightness = 10
+    glow.Range = 15
+    glow.Brightness = 5
     
     game:GetService("Debris"):AddItem(marker, 30)
     print("🟢 Marker gesetzt an: " .. tostring(position))
@@ -66,41 +65,35 @@ local function createMarker(position, text)
 end
 
 -- ==============================
--- MARKER BEI DIR
+-- FAKE POSITION (100 STUDS ENTFERNT)
 -- ==============================
-createMarker(rootPart.Position, "🎯 DU BIST HIER (ECHTER STANDORT)")
-print("🟢 Marker bei dir gesetzt!")
-
--- ==============================
--- FAKE POSITION (1.000.000 STUDS)
--- ==============================
-local fakePos = rootPart.Position + Vector3.new(1000000, 100000, 1000000)
+local fakePos = rootPart.Position + Vector3.new(100, 10, 100)
 
 -- ==============================
 -- MARKER AN FAKE POSITION
 -- ==============================
-createMarker(fakePos, "🎯 FAKE POSITION (1.000.000 STUDS ENTFERNT)")
+createMarker(fakePos, "🎯 ANDERE SEHEN DICH HIER")
 print("🟢 Marker an Fake Position: " .. tostring(fakePos))
 
 -- ==============================
--- DESYNC (1.000.000 STUDS)
+-- DESYNC (100 STUDS - HART)
 -- ==============================
 local offset = Vector3.new(0, 0, 0)
 
 RunService.Heartbeat:Connect(function()
     if not rootPart or not rootPart.Parent then return end
     
+    -- HARTER DESYNC: Direkte Teleportation zur Fake Position
     local target = Vector3.new(
-        math.random(-100000000, 100000000) / 100,  -- 1.000.000 Studs
-        math.random(-20000000, 20000000) / 100,
-        math.random(-100000000, 100000000) / 100
+        math.random(-10000, 10000) / 100,  -- 100 Studs
+        math.random(-1000, 1000) / 100,
+        math.random(-10000, 10000) / 100
     )
     
-    offset = offset:Lerp(target, 0.05)
+    offset = offset:Lerp(target, 0.3)  -- Schnelleres Gleiten
     rootPart.CFrame = rootPart.CFrame + offset
 end)
 
-print("💀 1.000.000 STUDS DESYNC LÄUFT!")
-print("📌 Andere sehen dich 1.000.000 Studs entfernt!")
-print("⚠️ 100% BANN - NUR AUF WEGWERF-ACCOUNTS!")
-print("⚠️ ROBLOX WIRD DICH SOFORT BANNEN + CRASH!")
+print("🔥 100 STUDS DESYNC LÄUFT!")
+print("📌 Andere sehen dich an der FAKE POSITION!")
+print("📌 Du siehst dich selbst normal!")
