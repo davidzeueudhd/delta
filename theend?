@@ -1,0 +1,73 @@
+--[[
+    EXTREMER TEST: 10 STUDS DESYNC
+    - Resetet den Character 1x
+    - Zeigt grünen Marker an Fake Position
+    - Desync mit 10 Studs (sehr sichtbar)
+]]
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+print("🔥 EXTREMER TEST STARTET...")
+
+-- ==============================
+-- RESET 1x
+-- ==============================
+print("🔄 Reset...")
+character.Humanoid.Health = 0
+local newChar = player.CharacterAdded:Wait()
+character = newChar
+rootPart = character:WaitForChild("HumanoidRootPart")
+print("✅ Respawned!")
+
+-- ==============================
+-- FAKE POSITION (10 STUDS)
+-- ==============================
+local fakePos = rootPart.Position + Vector3.new(10, 0, 10)
+
+-- ==============================
+-- GRÜNER MARKER
+-- ==============================
+local marker = Instance.new("Part")
+marker.Size = Vector3.new(8, 1, 8)
+marker.Position = fakePos
+marker.Anchored = true
+marker.CanCollide = false
+marker.BrickColor = BrickColor.new("Bright green")
+marker.Material = Enum.Material.Neon
+marker.Transparency = 0.2
+marker.Parent = Workspace
+
+local glow = Instance.new("PointLight")
+glow.Parent = marker
+glow.Color = Color3.fromRGB(0, 255, 0)
+glow.Range = 20
+glow.Brightness = 5
+
+print("🟢 Marker an FAKE Position: " .. tostring(fakePos))
+
+-- ==============================
+-- DESYNC (10 STUDS)
+-- ==============================
+local offset = Vector3.new(0, 0, 0)
+
+RunService.Heartbeat:Connect(function()
+    if not rootPart or not rootPart.Parent then return end
+    
+    local target = Vector3.new(
+        math.random(-1000, 1000) / 100,
+        math.random(-200, 200) / 100,
+        math.random(-1000, 1000) / 100
+    )
+    
+    offset = offset:Lerp(target, 0.1)
+    rootPart.CFrame = rootPart.CFrame + offset
+end)
+
+print("🔥 10 STUDS DESYNC LÄUFT!")
+print("📌 Andere sollten dich 10 Studs versetzt sehen!")
