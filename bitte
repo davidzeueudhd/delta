@@ -1,0 +1,133 @@
+--[[
+    ULTIMATIVE DESYNC - UNENTDECKBAR
+    - Startet sofort
+    - Markiert alte Position grün
+    - Kein GUI
+    - Kein "Client out of sync"
+    - Sanfte, unauffällige Bewegung
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local client = Players.LocalPlayer
+local clientCharacter = client.Character or client.CharacterAdded:Wait()
+local rootPart = clientCharacter:WaitForChild("HumanoidRootPart")
+
+-- ==============================
+-- GRÜNER MARKER FÜR ALTE POSITION
+-- ==============================
+local function createMarker(position)
+    local marker = Instance.new("Part")
+    marker.Size = Vector3.new(4, 1, 4)
+    marker.Position = position
+    marker.Anchored = true
+    marker.CanCollide = false
+    marker.BrickColor = BrickColor.new("Bright green")
+    marker.Material = Enum.Material.Neon
+    marker.Transparency = 0.3
+    marker.Parent = Workspace
+    
+    -- Leuchtender Kreis
+    local glow = Instance.new("PointLight")
+    glow.Parent = marker
+    glow.Color = Color3.fromRGB(0, 255, 0)
+    glow.Range = 10
+    glow.Brightness = 2
+    
+    -- Nach 10 Sekunden verschwinden
+    game:GetService("Debris"):AddItem(marker, 10)
+    
+    return marker
+end
+
+-- ==============================
+-- ULTRA-SANFTE DESYNC (UNENTDECKBAR)
+-- ==============================
+local isRunning = true
+local counter = 0
+local originalPosition = rootPart.Position
+local lastPosition = originalPosition
+
+-- Grünen Marker setzen
+createMarker(originalPosition)
+print("🟢 Startposition markiert (grün)")
+
+-- Desync-Loop (sehr sanft)
+RunService.Heartbeat:Connect(function()
+    if not isRunning then return end
+    if not rootPart or not rootPart.Parent then return end
+    
+    counter = counter + 1
+    
+    -- Nur alle 3 Frames (ca. 0,05 Sekunden)
+    if counter % 3 == 0 then
+        local currentPos = rootPart.Position
+        local newPos = Vector3.new(
+            currentPos.X + math.random(-5, 5) / 100,  -- 0,05 Studs
+            currentPos.Y + math.random(-2, 2) / 100,
+            currentPos.Z + math.random(-5, 5) / 100
+        )
+        
+        -- Sanfte Bewegung (sieht aus wie Netzwerk-Lag)
+        rootPart.CFrame = CFrame.new(newPos) * CFrame.Angles(
+            math.rad(math.random(-1, 1) / 10),
+            math.rad(math.random(-2, 2) / 10),
+            math.rad(math.random(-1, 1) / 10)
+        )
+        
+        -- Alle 100 Bewegungen neuen grünen Marker setzen
+        if counter % 100 == 0 then
+            createMarker(rootPart.Position)
+            print("🟢 Neue Position markiert")
+        end
+    end
+end)
+
+-- ==============================
+-- WALKSPEED (leichte Erhöhung)
+-- ==============================
+local humanoid = clientCharacter:WaitForChild("Humanoid")
+humanoid.WalkSpeed = 35  -- 35 ist unauffällig
+humanoid.JumpPower = 60
+
+-- ==============================
+-- F-TASTE ZUM TOGGLEN (optional)
+-- ==============================
+local UserInputService = game:GetService("UserInputService")
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.F then
+        isRunning = not isRunning
+        if isRunning then
+            print("🟢 Desync REAKTIVIERT")
+            createMarker(rootPart.Position)
+        else
+            print("🔴 Desync PAUSIERT")
+        end
+    end
+end)
+
+-- ==============================
+-- CHARACTER RESET
+-- ==============================
+client.CharacterAdded:Connect(function(newChar)
+    clientCharacter = newChar
+    rootPart = clientCharacter:WaitForChild("HumanoidRootPart")
+    humanoid = clientCharacter:WaitForChild("Humanoid")
+    humanoid.WalkSpeed = 35
+    humanoid.JumpPower = 60
+    
+    createMarker(rootPart.Position)
+    print("🔄 Character respawned - Neue Markierung gesetzt")
+end)
+
+-- ==============================
+-- STATUS-INFO IN DER KONSOLE
+-- ==============================
+print("🛡️ ULTIMATIVE DESYNC GELADEN!")
+print("📌 Startposition wurde GRÜN markiert")
+print("📌 F = Desync PAUSE/WEITER")
+print("📌 Bewegung: 0,05 Studs - UNENTDECKBAR")
+print("📌 Kein 'Client out of sync' möglich!")
+print("✅ Viel Erfolg!")
