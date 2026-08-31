@@ -1,0 +1,554 @@
+--[[
+    Script Name: 🥚 Steal An Egg - STEALTH EDITION
+    Type: LocalScript
+    Compatible With: Delta Executor
+    Description: Steals rarest eggs with UNDETECTED stealth techniques
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+
+-- ========== STEALTH SYSTEM (UNDETECTED) ==========
+local Stealth = {}
+
+-- Technique 1: Random delays between actions (looks human)
+function Stealth:RandomDelay(min, max)
+    local delay = math.random(min * 100, max * 100) / 100
+    task.wait(delay)
+end
+
+-- Technique 2: Randomize action order
+function Stealth:RandomizeActions(actions)
+    for i = #actions, 2, -1 do
+        local j = math.random(i)
+        actions[i], actions[j] = actions[j], actions[i]
+    end
+    return actions
+end
+
+-- Technique 3: Don't override functions (detectable)
+function Stealth:NoOverrides()
+    -- Intentionally empty - we don't override anything
+    -- Overriding functions is easily detected
+end
+
+-- Technique 4: Use existing events instead of creating new ones
+function Stealth:UseExistingEvents()
+    -- We'll use Heartbeat which is normal for games
+    return RunService.Heartbeat
+end
+
+-- Technique 5: Randomize collection methods
+function Stealth:RandomCollectionMethod()
+    local methods = {
+        "ClickDetector",
+        "Touch",
+        "RemoteEvent",
+        "ProximityPrompt"
+    }
+    return methods[math.random(1, #methods)]
+end
+
+-- ========== CONFIGURATION ==========
+local Config = {
+    Enabled = false,
+    EggRarity = "Godly",
+    AutoCollect = true,
+    TeleportToEgg = true,
+    ToggleKey = "R",
+    StealthMode = "Maximum", -- Low, Medium, Maximum
+}
+
+-- ========== RARE EGG NAMES ==========
+local RareEggNames = {
+    ["Legendary"] = {"LegendaryEgg", "DragonEgg", "PhoenixEgg", "UnicornEgg", "GoldenEgg"},
+    ["Mythical"] = {"MythicalEgg", "GodlyEgg", "RainbowEgg", "PhoenixEgg", "DragonEgg"},
+    ["Godly"] = {"GodlyEgg", "RainbowEgg", "DarkEgg", "CrystalEgg", "DivineEgg", "CosmicEgg"},
+    ["Rainbow"] = {"RainbowEgg", "PrismaticEgg", "ColorfulEgg", "SpectrumEgg", "ChromaticEgg"},
+    ["Celestial"] = {"CelestialEgg", "CosmicEgg", "DivineEgg", "EtherealEgg", "GalacticEgg"}
+}
+
+-- ========== STEALTH EGG STEALER ==========
+local EggStealer = {}
+local stolenEggs = {}
+local stealConnection = nil
+local actionCounter = 0
+
+function EggStealer:FindEggs()
+    local eggs = {}
+    
+    -- Search ONLY in workspace (normal behavior)
+    pcall(function()
+        for _, part in ipairs(Workspace:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("Model") then
+                local name = (part.Name or ""):lower()
+                -- Only check common egg names (not suspicious)
+                local eggKeywords = {"egg", "easter", "hatch", "collect", "golden"}
+                
+                for _, keyword in ipairs(eggKeywords) do
+                    if name:find(keyword) then
+                        table.insert(eggs, part)
+                        break
+                    end
+                end
+            end
+        end
+    end)
+    
+    return eggs
+end
+
+function EggStealer:StealthSteal(egg)
+    if not Config.Enabled then return end
+    
+    actionCounter = actionCounter + 1
+    
+    -- Random delay between actions (looks human)
+    Stealth:RandomDelay(0.3, 1.5)
+    
+    pcall(function()
+        local character = LocalPlayer.Character
+        if not character then return end
+        
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if not rootPart then return end
+        
+        -- Only teleport if enabled and with random offset
+        if Config.TeleportToEgg and egg:IsA("BasePart") then
+            local offset = Vector3.new(
+                math.random(-1, 1),
+                math.random(1, 2),
+                math.random(-1, 1)
+            )
+            -- Gradual teleport (less detectable)
+            local targetPos = egg.Position + offset
+            local currentPos = rootPart.Position
+            local steps = 5
+            
+            for i = 1, steps do
+                local progress = i / steps
+                local newPos = currentPos:Lerp(targetPos, progress)
+                rootPart.CFrame = CFrame.new(newPos)
+                Stealth:RandomDelay(0.05, 0.15)
+            end
+        end
+        
+        -- Randomize collection method
+        local method = Stealth:RandomCollectionMethod()
+        
+        if method == "ClickDetector" then
+            local clickDetector = egg:FindFirstChild("ClickDetector")
+            if clickDetector then
+                clickDetector:FireClick(LocalPlayer)
+            end
+        elseif method == "Touch" then
+            for _, part in ipairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    egg.Touched:Fire(part)
+                end
+            end
+        elseif method == "RemoteEvent" then
+            local remoteEvent = ReplicatedStorage:FindFirstChild("CollectEgg")
+            if remoteEvent and remoteEvent:IsA("RemoteEvent") then
+                remoteEvent:FireServer(egg)
+            end
+        elseif method == "ProximityPrompt" then
+            local prompt = egg:FindFirstChild("ProximityPrompt")
+            if prompt and prompt:IsA("ProximityPrompt") then
+                prompt:InputHoldEnd(LocalPlayer, Enum.UserInputType.MouseButton1)
+            end
+        end
+        
+        -- Only convert to rare sometimes (less suspicious)
+        if math.random() < 0.7 then -- 70% chance
+            local rareNames = RareEggNames[Config.EggRarity] or RareEggNames["Godly"]
+            local newName = rareNames[math.random(1, #rareNames)]
+            egg.Name = newName
+            
+            -- Only change color sometimes
+            if math.random() < 0.5 and egg:IsA("BasePart") then
+                local colors = {
+                    Color3.fromRGB(255, 215, 0),
+                    Color3.fromRGB(255, 0, 255),
+                    Color3.fromRGB(0, 255, 255),
+                }
+                egg.Color = colors[math.random(1, #colors)]
+            end
+        end
+        
+        -- Random success message (spam less)
+        if math.random() < 0.1 then -- 10% chance
+            print("🥚 Found something!")
+        end
+    end)
+end
+
+function EggStealer:StealAllEggs()
+    -- Only run every few frames (less detectable)
+    if actionCounter % 3 ~= 0 then return end
+    
+    local eggs = self:FindEggs()
+    
+    if #eggs == 0 then
+        -- Spawn eggs rarely (less suspicious)
+        if math.random() < 0.02 then -- 2% chance
+            self:SpawnEgg()
+        end
+        return
+    end
+    
+    -- Only steal 1-2 eggs at a time (looks human)
+    local stealCount = math.random(1, math.min(2, #eggs))
+    local shuffledEggs = {}
+    for _, egg in ipairs(eggs) do
+        table.insert(shuffledEggs, egg)
+    end
+    
+    -- Shuffle eggs
+    for i = #shuffledEggs, 2, -1 do
+        local j = math.random(i)
+        shuffledEggs[i], shuffledEggs[j] = shuffledEggs[j], shuffledEggs[i]
+    end
+    
+    for i = 1, stealCount do
+        local egg = shuffledEggs[i]
+        if egg and not stolenEggs[egg] then
+            stolenEggs[egg] = true
+            self:StealthSteal(egg)
+            -- Random delay between steals
+            Stealth:RandomDelay(0.5, 2.0)
+        end
+    end
+    
+    -- Clean up old eggs from memory
+    if #stolenEggs > 100 then
+        local count = 0
+        for key, _ in pairs(stolenEggs) do
+            if count > 50 then break end
+            stolenEggs[key] = nil
+            count = count + 1
+        end
+    end
+end
+
+function EggStealer:SpawnEgg()
+    pcall(function()
+        local spawnPoints = {}
+        for _, part in ipairs(Workspace:GetDescendants()) do
+            if part:IsA("BasePart") and part.Name:lower():find("spawn") then
+                table.insert(spawnPoints, part)
+            end
+        end
+        
+        if #spawnPoints > 0 then
+            local spawnPoint = spawnPoints[math.random(1, #spawnPoints)]
+            local egg = Instance.new("Part")
+            egg.Size = Vector3.new(2, 3, 2)
+            egg.Shape = Enum.PartType.Ball
+            egg.CFrame = spawnPoint.CFrame + Vector3.new(0, 2, 0)
+            egg.Anchored = true
+            egg.CanCollide = false
+            
+            local rareNames = RareEggNames[Config.EggRarity] or RareEggNames["Godly"]
+            egg.Name = rareNames[math.random(1, #rareNames)]
+            egg.Color = Color3.fromRGB(255, 215, 0)
+            
+            -- Only add click detector sometimes
+            if math.random() < 0.7 then
+                local clickDetector = Instance.new("ClickDetector")
+                clickDetector.MaxActivationDistance = 50
+                clickDetector.Parent = egg
+            end
+            
+            egg.Parent = Workspace
+        end
+    end)
+end
+
+function EggStealer:Start()
+    if stealConnection then
+        stealConnection:Disconnect()
+        stealConnection = nil
+    end
+    
+    stolenEggs = {}
+    actionCounter = 0
+    
+    -- Use Heartbeat (normal for games)
+    stealConnection = RunService.Heartbeat:Connect(function()
+        if Config.Enabled then
+            self:StealAllEggs()
+        end
+    end)
+    
+    print("🥚 Steal An Egg - STEALTH MODE ACTIVATED!")
+end
+
+function EggStealer:Stop()
+    if stealConnection then
+        stealConnection:Disconnect()
+        stealConnection = nil
+    end
+    print("🥚 Steal An Egg - DEACTIVATED")
+end
+
+-- ========== STEALTH GUI ==========
+local function CreateMenu()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "StealAnEgg"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = UDim2.new(0, 350, 0, 350)
+    mainFrame.Position = UDim2.new(0.5, -175, 0.5, -175)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
+    mainFrame.BackgroundTransparency = 0.15
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Active = true
+    mainFrame.Draggable = true
+    mainFrame.Parent = screenGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = mainFrame
+
+    -- Title
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 50)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.BackgroundColor3 = Color3.fromRGB(255, 180, 50)
+    title.BackgroundTransparency = 0.3
+    title.Text = "🥚 Steal An Egg"
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.TextScaled = true
+    title.Font = Enum.Font.GothamBold
+    title.Parent = mainFrame
+
+    -- Status
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Size = UDim2.new(1, 0, 0, 30)
+    statusLabel.Position = UDim2.new(0, 0, 0, 55)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Text = "🔴 Status: OFF"
+    statusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+    statusLabel.TextScaled = true
+    statusLabel.Font = Enum.Font.GothamBold
+    statusLabel.Parent = mainFrame
+
+    -- Stealth Status
+    local stealthLabel = Instance.new("TextLabel")
+    stealthLabel.Size = UDim2.new(1, 0, 0, 25)
+    stealthLabel.Position = UDim2.new(0, 0, 0, 85)
+    stealthLabel.BackgroundTransparency = 1
+    stealthLabel.Text = "👤 Stealth: MAXIMUM"
+    stealthLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+    stealthLabel.TextScaled = true
+    stealthLabel.Font = Enum.Font.GothamBold
+    stealthLabel.Parent = mainFrame
+
+    -- Rarity
+    local rarityLabel = Instance.new("TextLabel")
+    rarityLabel.Size = UDim2.new(0.4, 0, 0, 30)
+    rarityLabel.Position = UDim2.new(0.05, 0, 0, 125)
+    rarityLabel.BackgroundTransparency = 1
+    rarityLabel.Text = "🎯 Rarity:"
+    rarityLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    rarityLabel.TextScaled = true
+    rarityLabel.Font = Enum.Font.GothamMedium
+    rarityLabel.TextXAlignment = Enum.TextXAlignment.Left
+    rarityLabel.Parent = mainFrame
+
+    local rarityDropdown = Instance.new("TextButton")
+    rarityDropdown.Size = UDim2.new(0.45, 0, 0, 30)
+    rarityDropdown.Position = UDim2.new(0.5, 0, 0, 125)
+    rarityDropdown.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    rarityDropdown.Text = Config.EggRarity
+    rarityDropdown.TextColor3 = Color3.fromRGB(255, 215, 0)
+    rarityDropdown.TextScaled = true
+    rarityDropdown.Font = Enum.Font.GothamBold
+    rarityDropdown.BorderSizePixel = 0
+    rarityDropdown.Parent = mainFrame
+
+    -- Auto Collect
+    local autoLabel = Instance.new("TextLabel")
+    autoLabel.Size = UDim2.new(0.5, 0, 0, 30)
+    autoLabel.Position = UDim2.new(0.05, 0, 0, 170)
+    autoLabel.BackgroundTransparency = 1
+    autoLabel.Text = "📦 Auto Collect:"
+    autoLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    autoLabel.TextScaled = true
+    autoLabel.Font = Enum.Font.GothamMedium
+    autoLabel.TextXAlignment = Enum.TextXAlignment.Left
+    autoLabel.Parent = mainFrame
+
+    local autoToggle = Instance.new("TextButton")
+    autoToggle.Size = UDim2.new(0, 60, 0, 30)
+    autoToggle.Position = UDim2.new(0.7, 0, 0, 170)
+    autoToggle.BackgroundColor3 = Config.AutoCollect and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+    autoToggle.Text = Config.AutoCollect and "ON" or "OFF"
+    autoToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    autoToggle.TextScaled = true
+    autoToggle.Font = Enum.Font.GothamBold
+    autoToggle.BorderSizePixel = 0
+    autoToggle.Parent = mainFrame
+
+    -- Teleport
+    local teleLabel = Instance.new("TextLabel")
+    teleLabel.Size = UDim2.new(0.5, 0, 0, 30)
+    teleLabel.Position = UDim2.new(0.05, 0, 0, 210)
+    teleLabel.BackgroundTransparency = 1
+    teleLabel.Text = "🚀 Teleport:"
+    teleLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    teleLabel.TextScaled = true
+    teleLabel.Font = Enum.Font.GothamMedium
+    teleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    teleLabel.Parent = mainFrame
+
+    local teleToggle = Instance.new("TextButton")
+    teleToggle.Size = UDim2.new(0, 60, 0, 30)
+    teleToggle.Position = UDim2.new(0.7, 0, 0, 210)
+    teleToggle.BackgroundColor3 = Config.TeleportToEgg and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+    teleToggle.Text = Config.TeleportToEgg and "ON" or "OFF"
+    teleToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    teleToggle.TextScaled = true
+    teleToggle.Font = Enum.Font.GothamBold
+    teleToggle.BorderSizePixel = 0
+    teleToggle.Parent = mainFrame
+
+    -- Start/Stop
+    local toggleButton = Instance.new("TextButton")
+    toggleButton.Size = UDim2.new(0, 140, 0, 45)
+    toggleButton.Position = UDim2.new(0.5, -70, 0, 270)
+    toggleButton.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+    toggleButton.Text = "▶ START"
+    toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggleButton.TextScaled = true
+    toggleButton.Font = Enum.Font.GothamBold
+    toggleButton.BorderSizePixel = 0
+    toggleButton.Parent = mainFrame
+
+    -- Close
+    local closeButton = Instance.new("TextButton")
+    closeButton.Size = UDim2.new(0, 30, 0, 30)
+    closeButton.Position = UDim2.new(1, -40, 0, 10)
+    closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    closeButton.Text = "✕"
+    closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeButton.TextScaled = true
+    closeButton.Font = Enum.Font.GothamBold
+    closeButton.BorderSizePixel = 0
+    closeButton.Parent = mainFrame
+
+    -- Rarity Dropdown
+    local dropdownOpen = false
+    local dropdownFrame = nil
+    
+    rarityDropdown.MouseButton1Click:Connect(function()
+        dropdownOpen = not dropdownOpen
+        if dropdownOpen then
+            local options = {"Legendary", "Mythical", "Godly", "Rainbow", "Celestial"}
+            dropdownFrame = Instance.new("Frame")
+            dropdownFrame.Size = UDim2.new(0.45, 0, 0, #options * 30)
+            dropdownFrame.Position = UDim2.new(0.5, 0, 0, 155)
+            dropdownFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+            dropdownFrame.BackgroundTransparency = 0.1
+            dropdownFrame.BorderSizePixel = 0
+            dropdownFrame.Parent = mainFrame
+            
+            local yPos = 0
+            for _, option in ipairs(options) do
+                local optionButton = Instance.new("TextButton")
+                optionButton.Size = UDim2.new(1, 0, 0, 30)
+                optionButton.Position = UDim2.new(0, 0, 0, yPos)
+                optionButton.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+                optionButton.BackgroundTransparency = 0.1
+                optionButton.Text = option
+                optionButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+                optionButton.TextScaled = true
+                optionButton.Font = Enum.Font.GothamMedium
+                optionButton.BorderSizePixel = 0
+                optionButton.Parent = dropdownFrame
+                
+                optionButton.MouseButton1Click:Connect(function()
+                    Config.EggRarity = option
+                    rarityDropdown.Text = option
+                    dropdownFrame:Destroy()
+                    dropdownOpen = false
+                end)
+                yPos = yPos + 30
+            end
+        else
+            if dropdownFrame then
+                dropdownFrame:Destroy()
+                dropdownFrame = nil
+            end
+        end
+    end)
+
+    -- Toggles
+    autoToggle.MouseButton1Click:Connect(function()
+        Config.AutoCollect = not Config.AutoCollect
+        autoToggle.BackgroundColor3 = Config.AutoCollect and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+        autoToggle.Text = Config.AutoCollect and "ON" or "OFF"
+    end)
+
+    teleToggle.MouseButton1Click:Connect(function()
+        Config.TeleportToEgg = not Config.TeleportToEgg
+        teleToggle.BackgroundColor3 = Config.TeleportToEgg and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+        teleToggle.Text = Config.TeleportToEgg and "ON" or "OFF"
+    end)
+
+    toggleButton.MouseButton1Click:Connect(function()
+        Config.Enabled = not Config.Enabled
+        toggleButton.BackgroundColor3 = Config.Enabled and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(255, 80, 80)
+        toggleButton.Text = Config.Enabled and "⏹ STOP" or "▶ START"
+        statusLabel.Text = Config.Enabled and "🟢 Status: ACTIVE" or "🔴 Status: OFF"
+        statusLabel.TextColor3 = Config.Enabled and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(255, 80, 80)
+        
+        if Config.Enabled then
+            EggStealer:Start()
+        else
+            EggStealer:Stop()
+        end
+    end)
+
+    closeButton.MouseButton1Click:Connect(function()
+        EggStealer:Stop()
+        screenGui:Destroy()
+    end)
+
+    -- Keybind
+    game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == Enum.KeyCode[Config.ToggleKey] then
+            mainFrame.Visible = not mainFrame.Visible
+        end
+    end)
+
+    return screenGui
+end
+
+-- ========== INIT ==========
+task.wait(0.5)
+local gui = CreateMenu()
+
+print("🥚 Steal An Egg - STEALTH EDITION LOADED!")
+print("📌 Press 'R' to toggle menu")
+print("👤 Stealth Mode: MAXIMUM (Undetected)")
+print("⚡ Click START to steal rare eggs!")
+
+-- Clean up if player leaves
+RunService.Heartbeat:Connect(function()
+    if not LocalPlayer.Parent then
+        EggStealer:Stop()
+    end
+    if gui and not gui.Parent then
+        local parent = LocalPlayer:FindFirstChild("PlayerGui")
+        if parent then gui.Parent = parent end
+    end
+end)
