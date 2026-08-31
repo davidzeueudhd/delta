@@ -1,10 +1,11 @@
 --[[
-    DESYNC - LÄNGERE PAUSEN
-    - Bewegung: 0,8 Studs (stark)
-    - Frequenz: Alle 6 Frames (Satz ..... Satz ..... Satz)
+    TANK DESYNC - SEHR STARK
+    - Desync: 2,0 Studs (sehr stark)
+    - Frequenz: Alle 6 Frames
     - WalkSpeed: 35 (NORMAL)
-    - Sanfte Rotation
-    - Grüne Marker
+    - Kein Jump (für Tank optimiert)
+    - Grüne Marker: Alle 15 Bewegungen
+    - WARNUNG: EXTREM RISKANT!
 ]]
 
 local Players = game:GetService("Players")
@@ -39,7 +40,7 @@ local function createMarker(position)
 end
 
 -- ==============================
--- DESYNC MIT LÄNGEREN PAUSEN
+-- DESYNC (2,0 Studs)
 -- ==============================
 local isRunning = true
 local counter = 0
@@ -48,23 +49,23 @@ local originalPosition = rootPart.Position
 createMarker(originalPosition)
 print("🟢 Startposition markiert")
 
--- Desync-Loop (NUR ALLE 6 FRAMES)
+-- Desync-Loop (ALLE 6 FRAMES)
 RunService.Heartbeat:Connect(function()
     if not isRunning then return end
     if not rootPart or not rootPart.Parent then return end
     
     counter = counter + 1
     
-    -- NUR ALLE 6 FRAMES (Satz ..... Satz ..... Satz)
+    -- NUR ALLE 6 FRAMES
     if counter % 6 == 0 then
         local currentPos = rootPart.Position
         local newPos = Vector3.new(
-            currentPos.X + math.random(-80, 80) / 100,  -- 0,8 Studs
-            currentPos.Y + math.random(-15, 15) / 100,
-            currentPos.Z + math.random(-80, 80) / 100
+            currentPos.X + math.random(-200, 200) / 100,  -- 2,0 Studs
+            currentPos.Y + math.random(-40, 40) / 100,
+            currentPos.Z + math.random(-200, 200) / 100
         )
         
-        -- Sanfte Rotation
+        -- Sanfte Rotation (für Tank)
         rootPart.CFrame = CFrame.new(newPos) * CFrame.Angles(
             math.rad(math.random(-3, 3) / 10),
             math.rad(math.random(-6, 6) / 10),
@@ -74,6 +75,7 @@ RunService.Heartbeat:Connect(function()
         -- Alle 15 Bewegungen neuer Marker
         if counter % 15 == 0 then
             createMarker(rootPart.Position)
+            print("🟢 Neue Position markiert")
         end
     end
 end)
@@ -82,8 +84,9 @@ end)
 -- WALKSPEED (NORMAL)
 -- ==============================
 local humanoid = clientCharacter:WaitForChild("Humanoid")
-humanoid.WalkSpeed = 35
-humanoid.JumpPower = 60
+humanoid.WalkSpeed = 35  -- NORMAL
+
+-- KEIN JUMPPOWER (nicht nötig für Tank!)
 
 -- ==============================
 -- F-TASTE ZUM TOGGLEN
@@ -109,14 +112,15 @@ client.CharacterAdded:Connect(function(newChar)
     clientCharacter = newChar
     rootPart = clientCharacter:WaitForChild("HumanoidRootPart")
     humanoid = clientCharacter:WaitForChild("Humanoid")
-    humanoid.WalkSpeed = 35
-    humanoid.JumpPower = 60
+    humanoid.WalkSpeed = 35  -- NORMAL
     createMarker(rootPart.Position)
 end)
 
-print("⏳ DESYNC MIT LÄNGEREN PAUSEN GELADEN!")
-print("📌 Bewegung: 0,8 Studs")
-print("📌 Frequenz: Alle 6 Frames (Satz ..... Satz ..... Satz)")
+print("💀 TANK DESYNC - SEHR STARK GELADEN!")
+print("📌 Desync: 2,0 Studs (sehr stark)")
+print("📌 Frequenz: Alle 6 Frames")
 print("📌 WalkSpeed: 35 (NORMAL)")
+print("📌 KEIN JUMP (für Tank optimiert)")
+print("📌 Grüne Marker: Alle 15 Bewegungen")
 print("📌 F = PAUSE/WEITER")
-print("🟢 GRÜNE MARKER AKTIV")
+print("⚠️ EXTREM RISKANT - NUR AUF WEGWERF-ACCOUNTS!")
