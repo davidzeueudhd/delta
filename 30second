@@ -1,9 +1,8 @@
 --[[
-    ULTIMATIVE DESYNC - 30 SEKUNDEN VERZÖGERUNG
-    - Deine Position wird alle 1 Sekunde gespeichert
-    - Andere sehen dich an der Position von vor 30 Sekunden
-    - Du bewegst dich normal
-    - WARNUNG: 100% BANN!
+    30 SEKUNDEN VERZÖGERUNG - OHNE RESET
+    - Kein Reset → Hooks bleiben stabil
+    - Speichert Positionen sofort
+    - Andere sehen dich 30 Sek. versetzt
 ]]
 
 local Players = game:GetService("Players")
@@ -15,22 +14,12 @@ local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
-print("⏳ 30 SEKUNDEN VERZÖGERUNG STARTET...")
-
--- ==============================
--- RESET 1x
--- ==============================
-print("🔄 Reset...")
-character.Humanoid.Health = 0
-local newChar = player.CharacterAdded:Wait()
-character = newChar
-rootPart = character:WaitForChild("HumanoidRootPart")
-print("✅ Respawned!")
+print("⏳ 30 SEKUNDEN VERZÖGERUNG - OHNE RESET STARTET...")
 
 -- ==============================
 -- POSITIONSSPEICHER (30 Sekunden)
 -- ==============================
-local MAX_POSITIONS = 30  -- 30 Sekunden
+local MAX_POSITIONS = 30
 local positions = {}
 local counter = 0
 local realPosition = rootPart.Position
@@ -40,18 +29,16 @@ RunService.Heartbeat:Connect(function()
     if not rootPart or not rootPart.Parent then return end
     
     counter = counter + 1
-    if counter % 60 == 0 then  -- 60 Frames ≈ 1 Sekunde
+    if counter % 60 == 0 then
         table.insert(positions, {
             position = rootPart.Position,
             cframe = rootPart.CFrame
         })
         
-        -- Nur die letzten 30 Positionen behalten
         if #positions > MAX_POSITIONS then
             table.remove(positions, 1)
         end
         
-        -- Aktuelle Position für Hooks speichern
         realPosition = rootPart.Position
     end
 end)
@@ -95,17 +82,12 @@ local function createMarker(position, text)
 end
 
 -- ==============================
--- FAKE POSITION (Position von vor 30 Sekunden)
--- ==============================
-local fakeOffset = Vector3.new(0, 0, 0)
-
--- ==============================
--- HOOK 1: CFrame manipulieren (30 Sekunden alt)
+-- HOOK 1: CFrame manipulieren
 -- ==============================
 local hookCFrame = hookmetamethod(game, "__index", function(self, key)
     if not checkcaller() and key == "CFrame" and self == rootPart then
         if #positions >= 30 then
-            local oldData = positions[1]  -- Älteste Position (vor 30 Sek.)
+            local oldData = positions[1]
             if oldData then
                 return oldData.cframe
             end
@@ -116,12 +98,12 @@ local hookCFrame = hookmetamethod(game, "__index", function(self, key)
 end)
 
 -- ==============================
--- HOOK 2: Position manipulieren (30 Sekunden alt)
+-- HOOK 2: Position manipulieren
 -- ==============================
 local hookPosition = hookmetamethod(game, "__index", function(self, key)
     if not checkcaller() and key == "Position" and self == rootPart then
         if #positions >= 30 then
-            local oldData = positions[1]  -- Älteste Position (vor 30 Sek.)
+            local oldData = positions[1]
             if oldData then
                 return oldData.position
             end
@@ -132,14 +114,11 @@ local hookPosition = hookmetamethod(game, "__index", function(self, key)
 end)
 
 -- ==============================
--- ZUSÄTZLICHE SICHTBARE VERZÖGERUNG
+-- FAKE MARKER (nach 30 Sek.)
 -- ==============================
 local showFakeMarker = false
 
 RunService.Heartbeat:Connect(function()
-    if not rootPart or not rootPart.Parent then return end
-    
-    -- Wenn wir 30 Positionen haben, zeige Marker an der alten Position
     if #positions >= 30 and not showFakeMarker then
         local oldData = positions[1]
         if oldData then
@@ -151,7 +130,7 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ==============================
--- R-TASTE: ZEIGE AKTUELLE VERZÖGERUNG
+-- R-TASTE: MARKER
 -- ==============================
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
@@ -168,7 +147,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
-print("💀 30 SEKUNDEN VERZÖGERUNG LÄUFT!")
+print("💀 30 SEKUNDEN VERZÖGERUNG - OHNE RESET LÄUFT!")
 print("📌 Andere sehen dich an der Position von vor 30 Sekunden!")
 print("📌 Du bewegst dich normal!")
 print("📌 Drücke R = Marker an 30-Sekunden-alter Position")
