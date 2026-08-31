@@ -1,16 +1,17 @@
 --[[
-    TANK DESYNC - SEHR STARK
-    - Desync: 2,0 Studs (sehr stark)
-    - Frequenz: Alle 6 Frames
+    TANK DESYNC - 5 STUDS CLEAN
+    - Desync: 5,0 Studs (stark, aber clean)
+    - Sanfte Tween-Übergänge (flüssig)
     - WalkSpeed: 35 (NORMAL)
     - Kein Jump (für Tank optimiert)
     - Grüne Marker: Alle 15 Bewegungen
-    - WARNUNG: EXTREM RISKANT!
+    - F = PAUSE/WEITER
 ]]
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
 local client = Players.LocalPlayer
 local clientCharacter = client.Character or client.CharacterAdded:Wait()
 local rootPart = clientCharacter:WaitForChild("HumanoidRootPart")
@@ -40,7 +41,7 @@ local function createMarker(position)
 end
 
 -- ==============================
--- DESYNC (2,0 Studs)
+-- CLEAN DESYNC (5 STUDS MIT TWEEN)
 -- ==============================
 local isRunning = true
 local counter = 0
@@ -49,30 +50,41 @@ local originalPosition = rootPart.Position
 createMarker(originalPosition)
 print("🟢 Startposition markiert")
 
--- Desync-Loop (ALLE 6 FRAMES)
+-- Desync-Loop mit Tween (clean!)
 RunService.Heartbeat:Connect(function()
     if not isRunning then return end
     if not rootPart or not rootPart.Parent then return end
     
     counter = counter + 1
     
-    -- NUR ALLE 6 FRAMES
+    -- ALLE 6 FRAMES
     if counter % 6 == 0 then
         local currentPos = rootPart.Position
-        local newPos = Vector3.new(
-            currentPos.X + math.random(-200, 200) / 100,  -- 2,0 Studs
-            currentPos.Y + math.random(-40, 40) / 100,
-            currentPos.Z + math.random(-200, 200) / 100
+        
+        -- Zielposition mit 5 Studs Versatz
+        local targetPos = Vector3.new(
+            currentPos.X + math.random(-500, 500) / 100,  -- 5,0 Studs
+            currentPos.Y + math.random(-100, 100) / 100,
+            currentPos.Z + math.random(-500, 500) / 100
         )
         
-        -- Sanfte Rotation (für Tank)
-        rootPart.CFrame = CFrame.new(newPos) * CFrame.Angles(
-            math.rad(math.random(-3, 3) / 10),
-            math.rad(math.random(-6, 6) / 10),
-            math.rad(math.random(-3, 3) / 10)
+        -- SMOOTH TWEEN (clean & flüssig)
+        local tweenInfo = TweenInfo.new(
+            0.15,  -- Dauer (kurz, aber weich)
+            Enum.EasingStyle.Quad,  -- Sanftes Start/Ende
+            Enum.EasingDirection.InOut
         )
         
-        -- Alle 15 Bewegungen neuer Marker
+        local tween = TweenService:Create(rootPart, tweenInfo, {
+            CFrame = CFrame.new(targetPos) * CFrame.Angles(
+                math.rad(math.random(-2, 2) / 10),
+                math.rad(math.random(-4, 4) / 10),
+                math.rad(math.random(-2, 2) / 10)
+            )
+        })
+        tween:Play()
+        
+        -- Grüne Marker (alle 15 Bewegungen)
         if counter % 15 == 0 then
             createMarker(rootPart.Position)
             print("🟢 Neue Position markiert")
@@ -85,8 +97,6 @@ end)
 -- ==============================
 local humanoid = clientCharacter:WaitForChild("Humanoid")
 humanoid.WalkSpeed = 35  -- NORMAL
-
--- KEIN JUMPPOWER (nicht nötig für Tank!)
 
 -- ==============================
 -- F-TASTE ZUM TOGGLEN
@@ -112,15 +122,14 @@ client.CharacterAdded:Connect(function(newChar)
     clientCharacter = newChar
     rootPart = clientCharacter:WaitForChild("HumanoidRootPart")
     humanoid = clientCharacter:WaitForChild("Humanoid")
-    humanoid.WalkSpeed = 35  -- NORMAL
+    humanoid.WalkSpeed = 35
     createMarker(rootPart.Position)
 end)
 
-print("💀 TANK DESYNC - SEHR STARK GELADEN!")
-print("📌 Desync: 2,0 Studs (sehr stark)")
-print("📌 Frequenz: Alle 6 Frames")
+print("✨ TANK DESYNC - 5 STUDS CLEAN GELADEN!")
+print("📌 Desync: 5,0 Studs (stark, aber clean)")
+print("📌 Tween: Sanfte Übergänge (flüssig)")
 print("📌 WalkSpeed: 35 (NORMAL)")
 print("📌 KEIN JUMP (für Tank optimiert)")
-print("📌 Grüne Marker: Alle 15 Bewegungen")
 print("📌 F = PAUSE/WEITER")
 print("⚠️ EXTREM RISKANT - NUR AUF WEGWERF-ACCOUNTS!")
