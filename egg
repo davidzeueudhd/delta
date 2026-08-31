@@ -1,46 +1,287 @@
-print("🚀 SCRIPT STARTED!")
+loadstring([[
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
 
--- Check if script is running
-local LocalPlayer = game:GetService("Players").LocalPlayer
-print("✅ Player: " .. LocalPlayer.Name)
+-- ========== YOUR BASE POSITION ==========
+local MyBasePosition = nil
 
--- Check if we can create a part
-local testPart = Instance.new("Part")
-testPart.Name = "DEBUG_PART"
-testPart.Size = Vector3.new(5, 5, 5)
-testPart.Anchored = true
-testPart.Position = Vector3.new(0, 50, 0)
-testPart.Color = Color3.fromRGB(255, 0, 0)
-testPart.Parent = workspace
-print("✅ Red part created at 0, 50, 0! Look for it!")
-
--- Try to spawn an egg
-local tool = Instance.new("Tool")
-tool.Name = "SpawnedEgg"
-tool.RequiresHandle = false
-
-local handle = Instance.new("Part")
-handle.Name = "Handle"
-handle.Size = Vector3.new(2, 3, 2)
-handle.Shape = Enum.PartType.Ball
-handle.Color = Color3.fromRGB(255, 215, 0)
-handle.Material = Enum.Material.Neon
-handle.Parent = tool
-
-local backpack = LocalPlayer:FindFirstChild("Backpack")
-local inventory = LocalPlayer:FindFirstChild("Inventory")
-
-if backpack then
-    tool.Parent = backpack
-    print("✅ EGG IN BACKPACK!")
-elseif inventory then
-    tool.Parent = inventory
-    print("✅ EGG IN INVENTORY!")
-else
-    tool.Parent = LocalPlayer
-    print("✅ EGG ADDED TO PLAYER!")
+-- ========== FUNCTIONS ==========
+local function GetRoot()
+    local char = LocalPlayer.Character
+    if not char then return nil end
+    return char:FindFirstChild("HumanoidRootPart")
 end
 
-print("🎯 SCRIPT FINISHED! Look for:")
-print("  - Red part at position 0, 50, 0")
-print("  - Egg in your inventory/backpack")
+-- ========== SET BASE ==========
+local function SetBase()
+    local root = GetRoot()
+    if not root then
+        print("❌ No character found!")
+        return
+    end
+    MyBasePosition = root.Position
+    print("🏠 Base set at: " .. tostring(MyBasePosition))
+end
+
+-- ========== TELEPORT TO BASE ==========
+local function TeleportToBase()
+    if not MyBasePosition then
+        print("❌ Base not set! Click 'Set Base' first.")
+        return
+    end
+    
+    local root = GetRoot()
+    if not root then return end
+    
+    root.CFrame = CFrame.new(MyBasePosition + Vector3.new(0, 2, 0))
+    print("🏠 Teleported to YOUR base!")
+end
+
+-- ========== FIND BEST EGG ==========
+local function GetBestEgg()
+    local bestEgg = nil
+    local highestValue = -math.huge
+    
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") or obj:IsA("Model") then
+            local name = (obj.Name or ""):lower()
+            if name:find("egg") then
+                local value = 0
+                local valueTag = obj:FindFirstChild("Value")
+                if valueTag and valueTag:IsA("IntValue") then
+                    value = valueTag.Value
+                end
+                
+                if value > highestValue then
+                    highestValue = value
+                    bestEgg = obj
+                end
+            end
+        end
+    end
+    return bestEgg, highestValue
+end
+
+-- ========== TELEPORT TO BEST EGG ==========
+local function TeleportToBestEgg()
+    local root = GetRoot()
+    if not root then return end
+    
+    local egg, value = GetBestEgg()
+    if not egg or not egg:IsA("BasePart") then
+        print("❌ No valuable egg found!")
+        return
+    end
+    
+    print("🥚 Best egg: " .. egg.Name .. " (Value: " .. tostring(value) .. ")")
+    root.CFrame = CFrame.new(egg.Position + Vector3.new(0, 2, 0))
+    task.wait(0.2)
+    
+    -- Instant grab
+    local clickDetector = egg:FindFirstChild("ClickDetector")
+    if clickDetector and clickDetector:IsA("ClickDetector") then
+        clickDetector:FireClick(LocalPlayer)
+        print("✅ Grabbed egg instantly!")
+    end
+    
+    for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            egg.Touched:Fire(part)
+        end
+    end
+end
+
+-- ========== GUI ==========
+local function CreateGUI()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "EggStealer"
+    screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 280, 0, 240)
+    frame.Position = UDim2.new(0.5, -140, 0.5, -120)
+    frame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+    frame.BackgroundTransparency = 0.15
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.Draggable = true
+    frame.Parent = screenGui
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = frame
+    
+    -- Title
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 35)
+    title.BackgroundColor3 = Color3.fromRGB(255, 180, 50)
+    title.BackgroundTransparency = 0.3
+    title.Text = "🥚 BEST EGG STEALER"
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.TextScaled = true
+    title.Font = Enum.Font.GothamBold
+    title.Parent = frame
+    
+    -- Status
+    local status = Instance.new("TextLabel")
+    status.Size = UDim2.new(1, 0, 0, 25)
+    status.Position = UDim2.new(0, 0, 0, 40)
+    status.BackgroundTransparency = 1
+    status.Text = "🟢 Ready"
+    status.TextColor3 = Color3.fromRGB(0, 255, 100)
+    status.TextScaled = true
+    status.Font = Enum.Font.GothamBold
+    status.Parent = frame
+    
+    -- Teleport to Best Egg
+    local tpBtn = Instance.new("TextButton")
+    tpBtn.Size = UDim2.new(0.8, 0, 0, 35)
+    tpBtn.Position = UDim2.new(0.1, 0, 0, 75)
+    tpBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+    tpBtn.Text = "🚀 BEST EGG"
+    tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tpBtn.TextScaled = true
+    tpBtn.Font = Enum.Font.GothamBold
+    tpBtn.BorderSizePixel = 0
+    tpBtn.Parent = frame
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 10)
+    btnCorner.Parent = tpBtn
+    
+    -- Grab Button
+    local grabBtn = Instance.new("TextButton")
+    grabBtn.Size = UDim2.new(0.38, 0, 0, 30)
+    grabBtn.Position = UDim2.new(0.06, 0, 0, 120)
+    grabBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    grabBtn.Text = "⚡ GRAB"
+    grabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    grabBtn.TextScaled = true
+    grabBtn.Font = Enum.Font.GothamBold
+    grabBtn.BorderSizePixel = 0
+    grabBtn.Parent = frame
+    
+    local grabCorner = Instance.new("UICorner")
+    grabCorner.CornerRadius = UDim.new(0, 8)
+    grabCorner.Parent = grabBtn
+    
+    -- Set Base Button
+    local setBaseBtn = Instance.new("TextButton")
+    setBaseBtn.Size = UDim2.new(0.38, 0, 0, 30)
+    setBaseBtn.Position = UDim2.new(0.56, 0, 0, 120)
+    setBaseBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+    setBaseBtn.Text = "🏠 SET BASE"
+    setBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    setBaseBtn.TextScaled = true
+    setBaseBtn.Font = Enum.Font.GothamBold
+    setBaseBtn.BorderSizePixel = 0
+    setBaseBtn.Parent = frame
+    
+    local baseCorner = Instance.new("UICorner")
+    baseCorner.CornerRadius = UDim.new(0, 8)
+    baseCorner.Parent = setBaseBtn
+    
+    -- Teleport to Base Button
+    local tpBaseBtn = Instance.new("TextButton")
+    tpBaseBtn.Size = UDim2.new(0.8, 0, 0, 35)
+    tpBaseBtn.Position = UDim2.new(0.1, 0, 0, 162)
+    tpBaseBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+    tpBaseBtn.Text = "🏠 TP TO BASE"
+    tpBaseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tpBaseBtn.TextScaled = true
+    tpBaseBtn.Font = Enum.Font.GothamBold
+    tpBaseBtn.BorderSizePixel = 0
+    tpBaseBtn.Parent = frame
+    
+    local tpBaseCorner = Instance.new("UICorner")
+    tpBaseCorner.CornerRadius = UDim.new(0, 10)
+    tpBaseCorner.Parent = tpBaseBtn
+    
+    -- Close
+    local close = Instance.new("TextButton")
+    close.Size = UDim2.new(0, 25, 0, 25)
+    close.Position = UDim2.new(1, -35, 0, 6)
+    close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    close.Text = "✕"
+    close.TextColor3 = Color3.fromRGB(255, 255, 255)
+    close.TextScaled = true
+    close.Font = Enum.Font.GothamBold
+    close.BorderSizePixel = 0
+    close.Parent = frame
+    
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 8)
+    closeCorner.Parent = close
+    
+    -- Button Functions
+    tpBtn.MouseButton1Click:Connect(function()
+        status.Text = "⏳ Finding best egg..."
+        status.TextColor3 = Color3.fromRGB(255, 200, 0)
+        TeleportToBestEgg()
+        status.Text = "✅ Done!"
+        status.TextColor3 = Color3.fromRGB(0, 255, 100)
+        task.wait(2)
+        status.Text = "🟢 Ready"
+    end)
+    
+    grabBtn.MouseButton1Click:Connect(function()
+        local egg, _ = GetBestEgg()
+        if egg and egg:IsA("BasePart") then
+            local clickDetector = egg:FindFirstChild("ClickDetector")
+            if clickDetector and clickDetector:IsA("ClickDetector") then
+                clickDetector:FireClick(LocalPlayer)
+                print("⚡ Instantly grabbed egg!")
+                status.Text = "✅ Grabbed!"
+                status.TextColor3 = Color3.fromRGB(0, 255, 100)
+                task.wait(2)
+                status.Text = "🟢 Ready"
+            end
+        else
+            print("❌ No egg found!")
+        end
+    end)
+    
+    setBaseBtn.MouseButton1Click:Connect(function()
+        SetBase()
+        status.Text = "✅ Base Set!"
+        status.TextColor3 = Color3.fromRGB(0, 255, 100)
+        task.wait(2)
+        status.Text = "🟢 Ready"
+    end)
+    
+    tpBaseBtn.MouseButton1Click:Connect(function()
+        if not MyBasePosition then
+            print("❌ Base not set! Click 'SET BASE' first.")
+            return
+        end
+        status.Text = "⏳ Teleporting..."
+        status.TextColor3 = Color3.fromRGB(255, 200, 0)
+        TeleportToBase()
+        status.Text = "✅ At Base!"
+        status.TextColor3 = Color3.fromRGB(0, 255, 100)
+        task.wait(2)
+        status.Text = "🟢 Ready"
+    end)
+    
+    close.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
+    end)
+    
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == Enum.KeyCode.R then
+            frame.Visible = not frame.Visible
+        end
+    end)
+end
+
+task.wait(0.5)
+CreateGUI()
+print("🥚 BEST EGG STEALER LOADED!")
+print("📌 Press R to toggle menu")
+print("🏠 Click 'SET BASE' at YOUR base first!")
+print("🚀 Then click 'BEST EGG' to teleport and steal!")
+]])()
