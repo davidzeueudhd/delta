@@ -4,6 +4,8 @@
     Tasten: F = Desync | G = ESP
 ]]
 
+-- Verhindert, dass der Executor eine zweite Verbindung öffnet
+game:GetService("Players").LocalPlayer:SetAttribute("NoReconnect", true)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
