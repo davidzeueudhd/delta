@@ -1,51 +1,79 @@
 --[[
-    Script Name: 🥚 Egg Stealer - FIXED
+    Script Name: 🥚 ULTIMATE EGG STEALER - Pick & Choose
     Type: LocalScript
     Compatible With: Delta Executor
-    Description: Only targets actual eggs, no random teleports
+    Description: Shows ALL eggs in a list, pick which one to steal!
 ]]
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 
 -- ========== CONFIGURATION ==========
 local Config = {
     Enabled = false,
-    AutoCollect = true,
     TeleportToEgg = true,
     ToggleKey = "R",
 }
 
--- ========== EGG STEALER ==========
-local EggStealer = {}
-local stolenEggs = {}
-local stealConnection = nil
+-- ========== ALL EGG NAMES ==========
+local EggNames = {
+    "Egg", "EasterEgg", "GoldenEgg", "DragonEgg", "PhoenixEgg",
+    "UnicornEgg", "MythicalEgg", "GodlyEgg", "RainbowEgg", "DarkEgg",
+    "CrystalEgg", "DivineEgg", "CosmicEgg", "CelestialEgg", "HatchEgg",
+    "PetEgg", "MysteryEgg", "RareEgg", "EventEgg", "LegendaryEgg",
+    "AncientEgg", "RoyalEgg", "ChaosEgg", "EtherealEgg", "StellarEgg",
+    "GalacticEgg", "NebulaEgg", "PrismaticEgg", "ChromaticEgg", "IridescentEgg",
+    "SpectrumEgg", "CrackedEgg", "FertilizedEgg", "HatchingEgg", "CollectibleEgg",
+    "SpecialEgg", "GiftEgg", "SurpriseEgg", "MagicEgg", "EnchantedEgg",
+}
 
--- Function to find ONLY actual eggs
-function EggStealer:FindEggs()
+-- ========== EGG FINDER ==========
+local EggFinder = {}
+local eggList = {}
+local selectedEgg = nil
+
+function EggFinder:FindAllEggs()
     local eggs = {}
+    local seen = {}
     
     pcall(function()
+        -- Search Workspace
         for _, part in ipairs(Workspace:GetDescendants()) do
             if part:IsA("BasePart") or part:IsA("Model") then
                 local name = (part.Name or ""):lower()
+                local isEgg = false
                 
-                -- Only look for EXACT egg names
-                local exactEggNames = {
-                    "egg", "easteregg", "goldenegg", "dragonegg", 
-                    "phoenixegg", "unicornegg", "mythicalegg", "godlyegg",
-                    "rainbowegg", "darkegg", "crystalegg", "divineegg",
-                    "cosmicegg", "celestialegg", "hatchegg", "petegg"
-                }
-                
-                for _, eggName in ipairs(exactEggNames) do
-                    if name:find(eggName) then
-                        table.insert(eggs, part)
+                for _, eggName in ipairs(EggNames) do
+                    if name:find(eggName:lower()) then
+                        isEgg = true
                         break
                     end
+                end
+                
+                if not isEgg and name:find("egg") then
+                    isEgg = true
+                end
+                
+                if isEgg and not seen[part] then
+                    seen[part] = true
+                    table.insert(eggs, part)
+                end
+            end
+        end
+        
+        -- Search ReplicatedStorage
+        for _, part in ipairs(ReplicatedStorage:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("Model") then
+                local name = (part.Name or ""):lower()
+                if name:find("egg") and not seen[part] then
+                    seen[part] = true
+                    table.insert(eggs, part)
                 end
             end
         end
@@ -54,9 +82,55 @@ function EggStealer:FindEggs()
     return eggs
 end
 
--- Collect egg function
-function EggStealer:CollectEgg(egg)
-    if not Config.Enabled then return end
+function EggFinder:GetEggInfo(egg)
+    local info = {
+        Object = egg,
+        Name = egg.Name or "Unknown Egg",
+        Position = egg:IsA("BasePart") and egg.Position or Vector3.new(0, 0, 0),
+        Distance = 0,
+        Rarity = "Unknown",
+        Color = Color3.fromRGB(200, 200, 200),
+    }
+    
+    -- Get distance
+    local character = LocalPlayer.Character
+    if character then
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if rootPart and egg:IsA("BasePart") then
+            info.Distance = (egg.Position - rootPart.Position).Magnitude
+        end
+    end
+    
+    -- Guess rarity from name
+    local name = info.Name:lower()
+    if name:find("godly") or name:find("divine") or name:find("cosmic") or name:find("celestial") then
+        info.Rarity = "🌟 GODLY"
+        info.Color = Color3.fromRGB(255, 215, 0)
+    elseif name:find("mythical") or name:find("rainbow") or name:find("prismatic") then
+        info.Rarity = "🌈 MYTHICAL"
+        info.Color = Color3.fromRGB(255, 0, 255)
+    elseif name:find("legendary") or name:find("dragon") or name:find("phoenix") or name:find("unicorn") then
+        info.Rarity = "🔥 LEGENDARY"
+        info.Color = Color3.fromRGB(255, 100, 0)
+    elseif name:find("golden") or name:find("crystal") or name:find("ancient") then
+        info.Rarity = "💎 RARE"
+        info.Color = Color3.fromRGB(0, 200, 255)
+    elseif name:find("mystery") or name:find("event") or name:find("special") then
+        info.Rarity = "🎁 EVENT"
+        info.Color = Color3.fromRGB(255, 50, 200)
+    elseif name:find("egg") then
+        info.Rarity = "🥚 NORMAL"
+        info.Color = Color3.fromRGB(200, 200, 200)
+    end
+    
+    return info
+end
+
+-- ========== EGG STEALER ==========
+local EggStealer = {}
+
+function EggStealer:TeleportAndSteal(egg)
+    if not Config.Enabled or not egg then return end
     
     pcall(function()
         local character = LocalPlayer.Character
@@ -65,23 +139,25 @@ function EggStealer:CollectEgg(egg)
         local rootPart = character:FindFirstChild("HumanoidRootPart")
         if not rootPart then return end
         
-        -- Teleport to egg
+        -- Smooth teleport to egg
         if Config.TeleportToEgg and egg:IsA("BasePart") then
-            rootPart.CFrame = CFrame.new(egg.Position + Vector3.new(0, 2, 0))
-            task.wait(0.2)
+            local targetPos = egg.Position + Vector3.new(0, 2, 0)
+            rootPart.CFrame = CFrame.new(targetPos)
+            task.wait(0.1)
         end
         
-        -- Try to collect
+        -- Collect egg
         local collected = false
         
-        -- Method 1: ClickDetector
+        -- ClickDetector
         local clickDetector = egg:FindFirstChild("ClickDetector")
         if clickDetector then
             clickDetector:FireClick(LocalPlayer)
             collected = true
+            print("✅ Clicked: " .. egg.Name)
         end
         
-        -- Method 2: Touch
+        -- Touch
         if not collected then
             for _, part in ipairs(character:GetDescendants()) do
                 if part:IsA("BasePart") then
@@ -89,93 +165,65 @@ function EggStealer:CollectEgg(egg)
                 end
             end
             collected = true
+            print("✅ Touched: " .. egg.Name)
         end
         
-        -- Method 3: ProximityPrompt
+        -- ProximityPrompt
         if not collected then
             local prompt = egg:FindFirstChild("ProximityPrompt")
             if prompt and prompt:IsA("ProximityPrompt") then
                 prompt:InputHoldEnd(LocalPlayer, Enum.UserInputType.MouseButton1)
                 collected = true
+                print("✅ Used Prompt: " .. egg.Name)
             end
         end
         
-        if collected then
-            print("🥚 Collected egg: " .. (egg.Name or "Egg"))
+        -- RemoteEvent
+        if not collected then
+            local remoteEvent = ReplicatedStorage:FindFirstChild("CollectEgg")
+            if remoteEvent and remoteEvent:IsA("RemoteEvent") then
+                remoteEvent:FireServer(egg)
+                collected = true
+                print("✅ Fired Remote: " .. egg.Name)
+            end
+        end
+        
+        if not collected then
+            print("⚠️ Teleported to " .. egg.Name .. " but couldn't collect")
         end
     end)
 end
 
--- Scan for eggs
-function EggStealer:Scan()
-    local eggs = self:FindEggs()
-    
-    if #eggs == 0 then
-        return
-    end
-    
-    for _, egg in ipairs(eggs) do
-        if not stolenEggs[egg] then
-            stolenEggs[egg] = true
-            self:CollectEgg(egg)
-            task.wait(0.5)
-        end
-    end
-end
-
-function EggStealer:Start()
-    if stealConnection then
-        stealConnection:Disconnect()
-        stealConnection = nil
-    end
-    
-    stolenEggs = {}
-    
-    stealConnection = RunService.Heartbeat:Connect(function()
-        if Config.Enabled then
-            self:Scan()
-        end
-    end)
-    
-    print("🥚 Egg Stealer ACTIVATED!")
-end
-
-function EggStealer:Stop()
-    if stealConnection then
-        stealConnection:Disconnect()
-        stealConnection = nil
-    end
-    print("🥚 Egg Stealer DEACTIVATED")
-end
-
--- ========== SIMPLE GUI ==========
+-- ========== ADVANCED GUI ==========
 local function CreateMenu()
     local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "EggStealer"
+    screenGui.Name = "UltimateEggStealer"
     screenGui.ResetOnSpawn = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
+    -- Main Frame
     local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 280, 0, 220)
-    mainFrame.Position = UDim2.new(0.5, -140, 0.5, -110)
+    mainFrame.Size = UDim2.new(0, 450, 0, 500)
+    mainFrame.Position = UDim2.new(0.5, -225, 0.5, -250)
     mainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
-    mainFrame.BackgroundTransparency = 0.15
+    mainFrame.BackgroundTransparency = 0.1
     mainFrame.BorderSizePixel = 0
     mainFrame.Active = true
     mainFrame.Draggable = true
     mainFrame.Parent = screenGui
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
+    corner.CornerRadius = UDim.new(0, 15)
     corner.Parent = mainFrame
 
     -- Title
     local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, 45)
+    title.Size = UDim2.new(1, 0, 0, 50)
     title.Position = UDim2.new(0, 0, 0, 0)
     title.BackgroundColor3 = Color3.fromRGB(255, 180, 50)
     title.BackgroundTransparency = 0.3
-    title.Text = "🥚 Egg Stealer"
+    title.Text = "🥚 ULTIMATE EGG STEALER"
     title.TextColor3 = Color3.fromRGB(255, 255, 255)
     title.TextScaled = true
     title.Font = Enum.Font.GothamBold
@@ -183,46 +231,90 @@ local function CreateMenu()
 
     -- Status
     local statusLabel = Instance.new("TextLabel")
-    statusLabel.Size = UDim2.new(1, 0, 0, 30)
-    statusLabel.Position = UDim2.new(0, 0, 0, 50)
+    statusLabel.Size = UDim2.new(0.5, 0, 0, 30)
+    statusLabel.Position = UDim2.new(0.05, 0, 0, 55)
     statusLabel.BackgroundTransparency = 1
-    statusLabel.Text = "🔴 Status: OFF"
+    statusLabel.Text = "🔴 OFF"
     statusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
     statusLabel.TextScaled = true
     statusLabel.Font = Enum.Font.GothamBold
+    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
     statusLabel.Parent = mainFrame
 
-    -- Eggs Found
-    local foundLabel = Instance.new("TextLabel")
-    foundLabel.Size = UDim2.new(1, 0, 0, 25)
-    foundLabel.Position = UDim2.new(0, 0, 0, 80)
-    foundLabel.BackgroundTransparency = 1
-    foundLabel.Text = "Eggs Found: 0"
-    foundLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
-    foundLabel.TextScaled = true
-    foundLabel.Font = Enum.Font.GothamMedium
-    foundLabel.Parent = mainFrame
+    -- Refresh Button
+    local refreshBtn = Instance.new("TextButton")
+    refreshBtn.Size = UDim2.new(0, 100, 0, 30)
+    refreshBtn.Position = UDim2.new(0.7, 0, 0, 55)
+    refreshBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+    refreshBtn.Text = "🔄 Refresh"
+    refreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    refreshBtn.TextScaled = true
+    refreshBtn.Font = Enum.Font.GothamBold
+    refreshBtn.BorderSizePixel = 0
+    refreshBtn.Parent = mainFrame
 
-    -- Start/Stop Button
-    local toggleButton = Instance.new("TextButton")
-    toggleButton.Size = UDim2.new(0, 120, 0, 40)
-    toggleButton.Position = UDim2.new(0.5, -60, 0, 145)
-    toggleButton.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-    toggleButton.Text = "START"
-    toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    toggleButton.TextScaled = true
-    toggleButton.Font = Enum.Font.GothamBold
-    toggleButton.BorderSizePixel = 0
-    toggleButton.Parent = mainFrame
+    local refreshCorner = Instance.new("UICorner")
+    refreshCorner.CornerRadius = UDim.new(0, 8)
+    refreshCorner.Parent = refreshBtn
 
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0, 10)
-    btnCorner.Parent = toggleButton
+    -- Egg List Title
+    local listTitle = Instance.new("TextLabel")
+    listTitle.Size = UDim2.new(1, 0, 0, 25)
+    listTitle.Position = UDim2.new(0, 0, 0, 90)
+    listTitle.BackgroundTransparency = 1
+    listTitle.Text = "📋 Nearby Eggs (Click to steal)"
+    listTitle.TextColor3 = Color3.fromRGB(200, 200, 200)
+    listTitle.TextScaled = true
+    listTitle.Font = Enum.Font.GothamBold
+    listTitle.Parent = mainFrame
+
+    -- Scrolling Frame for Egg List
+    local scrollFrame = Instance.new("ScrollingFrame")
+    scrollFrame.Size = UDim2.new(1, -20, 0, 300)
+    scrollFrame.Position = UDim2.new(0, 10, 0, 120)
+    scrollFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    scrollFrame.BackgroundTransparency = 0.3
+    scrollFrame.BorderSizePixel = 0
+    scrollFrame.ScrollBarThickness = 6
+    scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(255, 180, 50)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scrollFrame.Parent = mainFrame
+
+    local scrollCorner = Instance.new("UICorner")
+    scrollCorner.CornerRadius = UDim.new(0, 10)
+    scrollCorner.Parent = scrollFrame
+
+    -- Selected Egg Info
+    local selectedLabel = Instance.new("TextLabel")
+    selectedLabel.Size = UDim2.new(1, 0, 0, 25)
+    selectedLabel.Position = UDim2.new(0, 0, 0, 425)
+    selectedLabel.BackgroundTransparency = 1
+    selectedLabel.Text = "Selected: None"
+    selectedLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+    selectedLabel.TextScaled = true
+    selectedLabel.Font = Enum.Font.GothamMedium
+    selectedLabel.Parent = mainFrame
+
+    -- Steal Button
+    local stealBtn = Instance.new("TextButton")
+    stealBtn.Size = UDim2.new(0, 150, 0, 35)
+    stealBtn.Position = UDim2.new(0.5, -75, 0, 455)
+    stealBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    stealBtn.Text = "🚀 STEAL SELECTED"
+    stealBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    stealBtn.TextScaled = true
+    stealBtn.Font = Enum.Font.GothamBold
+    stealBtn.BorderSizePixel = 0
+    stealBtn.Parent = mainFrame
+
+    local stealCorner = Instance.new("UICorner")
+    stealCorner.CornerRadius = UDim.new(0, 10)
+    stealCorner.Parent = stealBtn
 
     -- Close Button
     local closeButton = Instance.new("TextButton")
-    closeButton.Size = UDim2.new(0, 25, 0, 25)
-    closeButton.Position = UDim2.new(1, -35, 0, 8)
+    closeButton.Size = UDim2.new(0, 30, 0, 30)
+    closeButton.Position = UDim2.new(1, -40, 0, 10)
     closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     closeButton.Text = "✕"
     closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -235,44 +327,207 @@ local function CreateMenu()
     closeCorner.CornerRadius = UDim.new(0, 8)
     closeCorner.Parent = closeButton
 
-    -- Button functions
-    local eggCount = 0
-    
+    -- ========== FUNCTIONS ==========
+    local eggButtons = {}
+    local currentEggs = {}
+    local selectedEgg = nil
+
+    function RefreshEggList()
+        -- Clear old buttons
+        for _, btn in ipairs(eggButtons) do
+            btn:Destroy()
+        end
+        eggButtons = {}
+        currentEggs = {}
+        
+        -- Find eggs
+        local eggs = EggFinder:FindAllEggs()
+        
+        if #eggs == 0 then
+            local noEggLabel = Instance.new("TextLabel")
+            noEggLabel.Size = UDim2.new(1, 0, 0, 30)
+            noEggLabel.Position = UDim2.new(0, 0, 0, 10)
+            noEggLabel.BackgroundTransparency = 1
+            noEggLabel.Text = "❌ No eggs found nearby!"
+            noEggLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+            noEggLabel.TextScaled = true
+            noEggLabel.Font = Enum.Font.GothamMedium
+            noEggLabel.Parent = scrollFrame
+            table.insert(eggButtons, noEggLabel)
+            scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 50)
+            return
+        end
+        
+        -- Sort eggs by distance
+        local sortedEggs = {}
+        for _, egg in ipairs(eggs) do
+            local info = EggFinder:GetEggInfo(egg)
+            table.insert(sortedEggs, info)
+        end
+        
+        table.sort(sortedEggs, function(a, b)
+            return a.Distance < b.Distance
+        end)
+        
+        -- Create buttons for each egg
+        local yPos = 5
+        
+        for _, info in ipairs(sortedEggs) do
+            table.insert(currentEggs, info)
+            
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -10, 0, 35)
+            btn.Position = UDim2.new(0, 5, 0, yPos)
+            btn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+            btn.BackgroundTransparency = 0.2
+            btn.Text = ""
+            btn.BorderSizePixel = 0
+            btn.Parent = scrollFrame
+            
+            local btnCorner = Instance.new("UICorner")
+            btnCorner.CornerRadius = UDim.new(0, 8)
+            btnCorner.Parent = btn
+            
+            -- Egg Info inside button
+            local nameLabel = Instance.new("TextLabel")
+            nameLabel.Size = UDim2.new(0.45, 0, 1, 0)
+            nameLabel.Position = UDim2.new(0.02, 0, 0, 0)
+            nameLabel.BackgroundTransparency = 1
+            nameLabel.Text = info.Name
+            nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+            nameLabel.TextScaled = true
+            nameLabel.Font = Enum.Font.GothamBold
+            nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+            nameLabel.Parent = btn
+            
+            local rarityLabel = Instance.new("TextLabel")
+            rarityLabel.Size = UDim2.new(0.25, 0, 1, 0)
+            rarityLabel.Position = UDim2.new(0.5, 0, 0, 0)
+            rarityLabel.BackgroundTransparency = 1
+            rarityLabel.Text = info.Rarity
+            rarityLabel.TextColor3 = info.Color
+            rarityLabel.TextScaled = true
+            rarityLabel.Font = Enum.Font.GothamBold
+            rarityLabel.Parent = btn
+            
+            local distLabel = Instance.new("TextLabel")
+            distLabel.Size = UDim2.new(0.2, 0, 1, 0)
+            distLabel.Position = UDim2.new(0.78, 0, 0, 0)
+            distLabel.BackgroundTransparency = 1
+            distLabel.Text = math.floor(info.Distance) .. "s"
+            distLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+            distLabel.TextScaled = true
+            distLabel.Font = Enum.Font.GothamMedium
+            distLabel.TextXAlignment = Enum.TextXAlignment.Right
+            distLabel.Parent = btn
+            
+            -- Select on click
+            btn.MouseButton1Click:Connect(function()
+                selectedEgg = info
+                selectedLabel.Text = "Selected: " .. info.Name .. " (" .. info.Rarity .. ")"
+                selectedLabel.TextColor3 = info.Color
+                
+                -- Highlight selected
+                for _, b in ipairs(eggButtons) do
+                    if b:IsA("TextButton") then
+                        b.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+                    end
+                end
+                btn.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+            end)
+            
+            table.insert(eggButtons, btn)
+            yPos = yPos + 40
+        end
+        
+        scrollFrame.CanvasSize = UDim2.new(0, 0, 0, yPos + 10)
+    end
+
+    -- ========== BUTTON EVENTS ==========
+    -- Refresh
+    refreshBtn.MouseButton1Click:Connect(function()
+        RefreshEggList()
+        print("🔄 Egg list refreshed!")
+    end)
+
+    -- Steal Selected
+    stealBtn.MouseButton1Click:Connect(function()
+        if not selectedEgg then
+            print("⚠️ Select an egg first!")
+            return
+        end
+        
+        if not Config.Enabled then
+            print("⚠️ Enable the script first! Click START")
+            return
+        end
+        
+        print("🚀 Stealing: " .. selectedEgg.Name)
+        EggStealer:TeleportAndSteal(selectedEgg.Object)
+        
+        -- Refresh list after stealing
+        task.wait(0.5)
+        RefreshEggList()
+        selectedEgg = nil
+        selectedLabel.Text = "Selected: None"
+    end)
+
+    -- Start/Stop
+    local toggleButton = Instance.new("TextButton")
+    toggleButton.Size = UDim2.new(0, 100, 0, 30)
+    toggleButton.Position = UDim2.new(0.4, 0, 0, 55)
+    toggleButton.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+    toggleButton.Text = "START"
+    toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggleButton.TextScaled = true
+    toggleButton.Font = Enum.Font.GothamBold
+    toggleButton.BorderSizePixel = 0
+    toggleButton.Parent = mainFrame
+
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(0, 8)
+    toggleCorner.Parent = toggleButton
+
     toggleButton.MouseButton1Click:Connect(function()
         Config.Enabled = not Config.Enabled
         toggleButton.BackgroundColor3 = Config.Enabled and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(255, 80, 80)
         toggleButton.Text = Config.Enabled and "STOP" or "START"
-        statusLabel.Text = Config.Enabled and "🟢 Status: ACTIVE" or "🔴 Status: OFF"
+        statusLabel.Text = Config.Enabled and "🟢 ACTIVE" or "🔴 OFF"
         statusLabel.TextColor3 = Config.Enabled and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(255, 80, 80)
         
         if Config.Enabled then
-            EggStealer:Start()
+            print("🥚 Egg Stealer ENABLED! Select an egg and click STEAL!")
         else
-            EggStealer:Stop()
+            print("🥚 Egg Stealer DISABLED")
         end
     end)
 
+    -- Close
     closeButton.MouseButton1Click:Connect(function()
-        EggStealer:Stop()
         screenGui:Destroy()
     end)
 
-    -- Update egg count
-    game:GetService("RunService").Heartbeat:Connect(function()
-        if Config.Enabled then
-            local eggs = EggStealer:FindEggs()
-            eggCount = #eggs
-            foundLabel.Text = "Eggs Found: " .. eggCount
-        end
-    end)
-
     -- Keybind
-    game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         if input.KeyCode == Enum.KeyCode[Config.ToggleKey] then
             mainFrame.Visible = not mainFrame.Visible
         end
     end)
+
+    -- Auto-refresh every 5 seconds
+    game:GetService("RunService").Heartbeat:Connect(function()
+        if mainFrame.Visible and Config.Enabled then
+            -- Refresh every 60 frames
+            if math.floor(tick()) % 5 == 0 then
+                RefreshEggList()
+            end
+        end
+    end)
+
+    -- Initial refresh
+    task.wait(0.2)
+    RefreshEggList()
 
     return screenGui
 end
@@ -281,17 +536,14 @@ end
 task.wait(0.5)
 local gui = CreateMenu()
 
-print("🥚 Egg Stealer LOADED!")
+print("🥚 ULTIMATE EGG STEALER LOADED!")
 print("📌 Press 'R' to toggle menu")
-print("⚡ Click START to steal eggs!")
+print("🎯 Select an egg from the list and click STEAL!")
+print("🔄 Click Refresh to update the egg list")
 
 -- Clean up
 RunService.Heartbeat:Connect(function()
     if not LocalPlayer.Parent then
-        EggStealer:Stop()
-    end
-    if gui and not gui.Parent then
-        local parent = LocalPlayer:FindFirstChild("PlayerGui")
-        if parent then gui.Parent = parent end
+        if gui then gui:Destroy() end
     end
 end)
