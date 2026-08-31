@@ -62,16 +62,7 @@ local EggData = {
 -- ========== FIND REMOTES ==========
 local function FindRemotes()
     local remotes = {}
-    
-    -- Search all services for remote events
-    local services = {
-        ReplicatedStorage,
-        Workspace,
-        game:GetService("Lighting"),
-        game:GetService("ServerScriptService"),
-        LocalPlayer,
-    }
-    
+    local services = {ReplicatedStorage, Workspace, game:GetService("Lighting"), game:GetService("ServerScriptService"), LocalPlayer}
     for _, service in ipairs(services) do
         pcall(function()
             for _, child in ipairs(service:GetDescendants()) do
@@ -81,13 +72,11 @@ local function FindRemotes()
             end
         end)
     end
-    
     return remotes
 end
 
 -- ========== FIND INVENTORY ==========
 local function FindInventory()
-    -- Check common locations
     local locations = {
         LocalPlayer:FindFirstChild("Backpack"),
         LocalPlayer:FindFirstChild("Inventory"),
@@ -96,19 +85,10 @@ local function FindInventory()
         LocalPlayer:FindFirstChild("Collection"),
         workspace:FindFirstChild("Inventory"),
     }
-    
     for _, loc in ipairs(locations) do
-        if loc then
-            return loc
-        end
+        if loc then return loc end
     end
-    
-    -- Check if LocalPlayer itself is the inventory
-    if LocalPlayer:IsA("Model") then
-        return LocalPlayer
-    end
-    
-    -- Create folder as last resort
+    if LocalPlayer:IsA("Model") then return LocalPlayer end
     local folder = Instance.new("Folder")
     folder.Name = "Inventory"
     folder.Parent = LocalPlayer
@@ -119,30 +99,21 @@ end
 local function SpawnEgg()
     local eggData = EggData[Config.EggRarity] or EggData["Godly"]
     local success = false
-    local spawned = nil
     
     print("🥚 Attempting to spawn: " .. eggData.Name)
     
-    -- METHOD 1: Find and fire remote events
+    -- METHOD 1: Fire remote events
     local remotes = FindRemotes()
-    local remoteKeywords = {
-        "Give", "Add", "Spawn", "Get", "Collect", "Claim",
-        "Egg", "Item", "Inventory", "Gift"
-    }
+    local remoteKeywords = {"Give", "Add", "Spawn", "Get", "Collect", "Claim", "Egg", "Item", "Inventory", "Gift"}
     
     for _, remote in ipairs(remotes) do
         local name = (remote.Name or ""):lower()
         local shouldTry = false
-        
         for _, keyword in ipairs(remoteKeywords) do
-            if name:find(keyword:lower()) then
-                shouldTry = true
-                break
-            end
+            if name:find(keyword:lower()) then shouldTry = true break end
         end
         
         if shouldTry and remote:IsA("RemoteEvent") then
-            -- Try different argument patterns
             local patterns = {
                 {eggData.ID, 1},
                 {eggData.ID, LocalPlayer, 1},
@@ -169,16 +140,14 @@ local function SpawnEgg()
                 end)
                 if success then break end
             end
-            
             if success then break end
         end
     end
     
-    -- METHOD 2: Try cloning existing egg
+    -- METHOD 2: Clone existing egg
     if not success then
         local eggTemplates = {}
         local searchLocations = {ReplicatedStorage, ServerStorage, Workspace, game:GetService("Lighting")}
-        
         for _, loc in ipairs(searchLocations) do
             pcall(function()
                 for _, child in ipairs(loc:GetDescendants()) do
@@ -202,18 +171,16 @@ local function SpawnEgg()
             newEgg.Name = eggData.Name
             newEgg.Parent = FindInventory()
             success = true
-            spawned = newEgg
             print("✅ Cloned egg: " .. newEgg.Name)
         end
     end
     
-    -- METHOD 3: Create new egg tool
+    -- METHOD 3: Create new egg
     if not success then
         local tool = Instance.new("Tool")
         tool.Name = eggData.Name
         tool.RequiresHandle = false
         
-        -- Handle
         local handle = Instance.new("Part")
         handle.Name = "Handle"
         handle.Size = Vector3.new(2, 3, 2)
@@ -225,14 +192,12 @@ local function SpawnEgg()
         handle.CanCollide = false
         handle.Parent = tool
         
-        -- Glow
         local light = Instance.new("PointLight")
         light.Color = eggData.Color
         light.Brightness = 3
         light.Range = 15
         light.Parent = handle
         
-        -- Tags
         local value = Instance.new("IntValue")
         value.Name = "Value"
         value.Value = eggData.Value
@@ -248,22 +213,14 @@ local function SpawnEgg()
         id.Value = eggData.ID
         id.Parent = tool
         
-        -- Inventory
-        local inventory = FindInventory()
-        tool.Parent = inventory
+        tool.Parent = FindInventory()
         success = true
-        spawned = tool
         print("✅ Created tool: " .. tool.Name)
     end
     
-    -- METHOD 4: Try all remotes with common names
+    -- METHOD 4: Try common remote names
     if not success then
-        local commonNames = {
-            "GiveItem", "AddItem", "SpawnItem", "GetItem",
-            "CollectItem", "ClaimItem", "GiveEgg", "SpawnEgg",
-            "CollectEgg", "ClaimEgg", "AddEgg", "GetEgg"
-        }
-        
+        local commonNames = {"GiveItem", "AddItem", "SpawnItem", "GetItem", "CollectItem", "ClaimItem", "GiveEgg", "SpawnEgg", "CollectEgg", "ClaimEgg", "AddEgg", "GetEgg"}
         for _, name in ipairs(commonNames) do
             local remote = ReplicatedStorage:FindFirstChild(name)
             if remote and remote:IsA("RemoteEvent") then
@@ -277,7 +234,7 @@ local function SpawnEgg()
         end
     end
     
-    -- METHOD 5: Fire all remotes with "egg" in name
+    -- METHOD 5: Fire any remote with "egg" in name
     if not success then
         for _, remote in ipairs(remotes) do
             local name = (remote.Name or ""):lower()
@@ -337,8 +294,8 @@ local function CreateMenu()
     screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
     local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 380, 0, 350)
-    mainFrame.Position = UDim2.new(0.5, -190, 0.5, -175)
+    mainFrame.Size = UDim2.new(0, 380, 0, 320)
+    mainFrame.Position = UDim2.new(0.5, -190, 0.5, -160)
     mainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
     mainFrame.BackgroundTransparency = 0.1
     mainFrame.BorderSizePixel = 0
@@ -367,7 +324,7 @@ local function CreateMenu()
     statusLabel.Size = UDim2.new(1, 0, 0, 25)
     statusLabel.Position = UDim2.new(0, 0, 0, 55)
     statusLabel.BackgroundTransparency = 1
-    statusLabel.Text = "🟢 Ready"
+    statusLabel.Text = "🟢 Ready - Click SPAWN"
     statusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
     statusLabel.TextScaled = true
     statusLabel.Font = Enum.Font.GothamBold
@@ -582,9 +539,8 @@ local function CreateMenu()
         statusLabel.Text = "✅ Spawned " .. spawned .. " eggs!"
         statusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
         
-        -- Reset after 3 seconds
         task.wait(3)
-        statusLabel.Text = "🟢 Ready"
+        statusLabel.Text = "🟢 Ready - Click SPAWN"
         statusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
     end)
 
