@@ -1,10 +1,10 @@
 --[[
-    TIME RESET + CLEAN DESYNC
+    STARKER DESYNC - ANDERE SEHEN DICH WOANDERS
+    - Desync: 2,0 Studs (deutlich sichtbar für andere)
     - Kein Speed
     - Kein Toggle
     - Kein GUI
-    - Sanfter Desync (0,15 Studs)
-    - Grüne Marker an alter Position
+    - R-Taste = Marker an alter Position
 ]]
 
 local Players = game:GetService("Players")
@@ -17,27 +17,27 @@ local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
 -- ==============================
--- CLEAN DESYNC (SANFT)
+-- STARKER DESYNC (2,0 STUDS)
 -- ==============================
 RunService.Heartbeat:Connect(function()
     if not rootPart or not rootPart.Parent then return end
     
     local currentPos = rootPart.Position
     local newPos = Vector3.new(
-        currentPos.X + math.random(-15, 15) / 100,  -- 0,15 Studs
-        currentPos.Y + math.random(-3, 3) / 100,
-        currentPos.Z + math.random(-15, 15) / 100
+        currentPos.X + math.random(-200, 200) / 100,  -- 2,0 Studs
+        currentPos.Y + math.random(-40, 40) / 100,
+        currentPos.Z + math.random(-200, 200) / 100
     )
     
     rootPart.CFrame = CFrame.new(newPos) * CFrame.Angles(
-        math.rad(math.random(-1, 1) / 10),
-        math.rad(math.random(-2, 2) / 10),
-        math.rad(math.random(-1, 1) / 10)
+        math.rad(math.random(-3, 3) / 10),
+        math.rad(math.random(-6, 6) / 10),
+        math.rad(math.random(-3, 3) / 10)
     )
 end)
 
 -- ==============================
--- POSITIONEN SPEICHERN
+-- POSITIONEN SPEICHERN (für Marker)
 -- ==============================
 local MAX_POSITIONS = 20
 local positions = {}
@@ -111,7 +111,7 @@ player.CharacterAdded:Connect(function(newChar)
     print("🔄 Character respawned - Bereit")
 end)
 
-print("🟢 TIME RESET + DESYNC GELADEN!")
-print("📌 Desync: 0,15 Studs (sanft)")
+print("🔥 STARKER DESYNC GELADEN!")
+print("📌 Andere sehen dich an anderer Position (2,0 Studs)")
 print("📌 Drücke R = Marker an Position von vor 20 Sekunden")
 print("📌 KEINE Veränderungen an Speed oder Stats!")
