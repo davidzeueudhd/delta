@@ -1,0 +1,134 @@
+--[[
+    DESYNC SMOOTH - NORMAL SPEED
+    - Desync: 0,3 Studs (gleitend)
+    - Frequenz: Alle 3 Frames (sanft)
+    - WalkSpeed: 35 (NORMAL)
+    - JumpPower: 60 (NORMAL)
+    - Sanfte Rotation
+    - Grüne Marker
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+local client = Players.LocalPlayer
+local clientCharacter = client.Character or client.CharacterAdded:Wait()
+local rootPart = clientCharacter:WaitForChild("HumanoidRootPart")
+
+-- ==============================
+-- GRÜNER MARKER
+-- ==============================
+local function createMarker(position)
+    local marker = Instance.new("Part")
+    marker.Size = Vector3.new(3, 0.5, 3)
+    marker.Position = position
+    marker.Anchored = true
+    marker.CanCollide = false
+    marker.BrickColor = BrickColor.new("Bright green")
+    marker.Material = Enum.Material.Neon
+    marker.Transparency = 0.4
+    marker.Parent = Workspace
+    
+    local glow = Instance.new("PointLight")
+    glow.Parent = marker
+    glow.Color = Color3.fromRGB(0, 255, 0)
+    glow.Range = 8
+    glow.Brightness = 1.5
+    
+    game:GetService("Debris"):AddItem(marker, 15)
+    return marker
+end
+
+-- ==============================
+-- SMOOTH DESYNC
+-- ==============================
+local isRunning = true
+local counter = 0
+local originalPosition = rootPart.Position
+
+createMarker(originalPosition)
+print("🟢 Startposition markiert")
+
+-- Desync-Loop (sanft)
+RunService.Heartbeat:Connect(function()
+    if not isRunning then return end
+    if not rootPart or not rootPart.Parent then return end
+    
+    counter = counter + 1
+    
+    -- ALLE 3 FRAMES (sanfter)
+    if counter % 3 == 0 then
+        local currentPos = rootPart.Position
+        
+        -- Sanfte, zufällige Bewegung (0,3 Studs)
+        local targetPos = Vector3.new(
+            currentPos.X + math.random(-30, 30) / 100,
+            currentPos.Y + math.random(-5, 5) / 100,
+            currentPos.Z + math.random(-30, 30) / 100
+        )
+        
+        -- SMOOTH ÜBERGANG (Tween)
+        local tweenInfo = TweenInfo.new(
+            0.1,  -- Dauer (sehr kurz, aber weich)
+            Enum.EasingStyle.Quad,  -- Sanftes Start/Ende
+            Enum.EasingDirection.InOut
+        )
+        
+        local tween = TweenService:Create(rootPart, tweenInfo, {
+            CFrame = CFrame.new(targetPos) * CFrame.Angles(
+                math.rad(math.random(-2, 2) / 10),
+                math.rad(math.random(-4, 4) / 10),
+                math.rad(math.random(-2, 2) / 10)
+            )
+        })
+        tween:Play()
+        
+        -- Alle 20 Bewegungen neuer Marker
+        if counter % 20 == 0 then
+            createMarker(rootPart.Position)
+        end
+    end
+end)
+
+-- ==============================
+-- WALKSPEED (NORMAL!)
+-- ==============================
+local humanoid = clientCharacter:WaitForChild("Humanoid")
+humanoid.WalkSpeed = 35  -- NORMAL
+humanoid.JumpPower = 60  -- NORMAL
+
+-- ==============================
+-- F-TASTE ZUM TOGGLEN
+-- ==============================
+local UserInputService = game:GetService("UserInputService")
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.F then
+        isRunning = not isRunning
+        if isRunning then
+            print("🟢 Desync REAKTIVIERT")
+            createMarker(rootPart.Position)
+        else
+            print("🔴 Desync PAUSIERT")
+        end
+    end
+end)
+
+-- ==============================
+-- CHARACTER RESET
+-- ==============================
+client.CharacterAdded:Connect(function(newChar)
+    clientCharacter = newChar
+    rootPart = clientCharacter:WaitForChild("HumanoidRootPart")
+    humanoid = clientCharacter:WaitForChild("Humanoid")
+    humanoid.WalkSpeed = 35  -- NORMAL
+    humanoid.JumpPower = 60  -- NORMAL
+    createMarker(rootPart.Position)
+end)
+
+print("🌊 SMOOTH DESYNC GELADEN!")
+print("📌 Bewegung: 0,3 Studs - GLEITEND")
+print("📌 WalkSpeed: 35 (NORMAL)")
+print("📌 F = PAUSE/WEITER")
+print("🟢 GRÜNE MARKER AKTIV")
