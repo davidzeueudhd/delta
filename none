@@ -1,8 +1,5 @@
 --[[
-    FINAL FIXED VERSION - NO MOVEMENT BLOCK
-    - You can move freely
-    - Other players see you 30 seconds delayed
-    - No hooks blocking your input
+    FINAL FIX - OHNE PRINTS
 ]]
 
 local Players = game:GetService("Players")
@@ -14,34 +11,24 @@ local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
-print("⏳ FINAL FIXED VERSION LOADING...")
-
--- ==============================
--- STORE POSITIONS (30 seconds)
--- ==============================
 local MAX_POSITIONS = 30
 local positions = {}
 local counter = 0
 
 RunService.Heartbeat:Connect(function()
     if not rootPart or not rootPart.Parent then return end
-    
     counter = counter + 1
     if counter % 60 == 0 then
         table.insert(positions, {
             position = rootPart.Position,
             cframe = rootPart.CFrame
         })
-        
         if #positions > MAX_POSITIONS then
             table.remove(positions, 1)
         end
     end
 end)
 
--- ==============================
--- CREATE GHOST PART (visible to others)
--- ==============================
 local ghost = Instance.new("Part")
 ghost.Size = Vector3.new(1, 1, 1)
 ghost.Anchored = true
@@ -51,9 +38,6 @@ ghost.BrickColor = BrickColor.new("Bright green")
 ghost.Material = Enum.Material.Neon
 ghost.Parent = Workspace
 
--- ==============================
--- UPDATE GHOST POSITION (30 sec old)
--- ==============================
 RunService.Heartbeat:Connect(function()
     if #positions >= 30 then
         local oldData = positions[1]
@@ -64,26 +48,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ==============================
--- HOOK: REDIRECT OTHERS TO GHOST (but NOT you)
--- ==============================
-local hookCFrame = hookmetamethod(game, "__index", function(self, key)
-    if not checkcaller() and key == "CFrame" and self == rootPart then
-        return ghost.CFrame
-    end
-    return hookCFrame(self, key)
-end)
-
-local hookPosition = hookmetamethod(game, "__index", function(self, key)
-    if not checkcaller() and key == "Position" and self == rootPart then
-        return ghost.Position
-    end
-    return hookPosition(self, key)
-end)
-
--- ==============================
--- GREEN MARKER AT OLD POSITION
--- ==============================
 local function createMarker(position, text)
     local marker = Instance.new("Part")
     marker.Size = Vector3.new(10, 2, 10)
@@ -103,7 +67,7 @@ local function createMarker(position, text)
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
-    label.Text = text or "📍 OTHERS SEE YOU HERE"
+    label.Text = text or "📍 ANDERE SEHEN DICH HIER"
     label.TextColor3 = Color3.fromRGB(0, 255, 0)
     label.TextScaled = true
     label.Font = Enum.Font.Bold
@@ -119,41 +83,26 @@ local function createMarker(position, text)
     return marker
 end
 
--- ==============================
--- AUTO MARKER (after 30 seconds)
--- ==============================
 local markerPlaced = false
 
 RunService.Heartbeat:Connect(function()
     if #positions >= 30 and not markerPlaced then
         local oldData = positions[1]
         if oldData then
-            createMarker(oldData.position, "⏳ OTHERS SEE YOU HERE (30 SEC OLD)")
+            createMarker(oldData.position, "⏳ ANDERE SEHEN DICH HIER (30 SEK. ALT)")
             markerPlaced = true
-            print("✅ Marker placed at 30-second-old position!")
         end
     end
 end)
 
--- ==============================
--- R KEY: MANUAL MARKER
--- ==============================
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.R then
         if #positions >= 30 then
             local oldData = positions[1]
             if oldData then
-                createMarker(oldData.position, "⏳ 30 SECONDS AGO")
-                print("✅ Manual marker placed!")
+                createMarker(oldData.position, "⏳ VOR 30 SEKUNDEN")
             end
-        else
-            print("⚠️ Not enough positions yet (" .. #positions .. "/30)")
         end
     end
 end)
-
-print("✅ FINAL FIXED VERSION LOADED!")
-print("📌 YOU CAN MOVE FREELY!")
-print("📌 Others see you 30 seconds delayed!")
-print("📌 Press R for marker at old position")
