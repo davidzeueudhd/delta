@@ -1,0 +1,74 @@
+--[[
+    SERVER-LAGGER MIT KEYBIND
+    - Drücke die Taste, um den Lagger ein- oder auszuschalten.
+    - Erstellt viele Teile, um den Server zu belasten.
+    - Du bist von dem Lag ausgeschlossen.
+]]
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local Debris = game:GetService("Debris")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local isLaggerActive = false
+local laggerConnection = nil
+
+-- ==============================
+-- LAGGER-FUNKTION
+-- ==============================
+local function lagServer()
+    for i = 1, 500 do -- Erstelle 500 Teile pro Durchlauf
+        local part = Instance.new("Part")
+        part.Size = Vector3.new(1, 1, 1)
+        part.Position = Vector3.new(
+            math.random(-500, 500),
+            math.random(-100, 100),
+            math.random(-500, 500)
+        )
+        part.Anchored = false
+        part.CanCollide = true
+        part.Transparency = 0.5
+        part.BrickColor = BrickColor.random()
+        part.Parent = Workspace
+        
+        -- Lösche die Teile nach 3 Sekunden wieder, um eine Überlastung zu vermeiden
+        Debris:AddItem(part, 3)
+    end
+end
+
+-- ==============================
+-- LAGGER STARTEN / STOPPEN
+-- ==============================
+local function toggleLagger()
+    isLaggerActive = not isLaggerActive
+    
+    if isLaggerActive then
+        print("🟢 Server-Lagger AKTIVIERT")
+        -- Starte eine Schleife, die den Lagger ausführt
+        laggerConnection = RunService.Heartbeat:Connect(function()
+            lagServer()
+        end)
+    else
+        print("🔴 Server-Lagger DEAKTIVIERT")
+        if laggerConnection then
+            laggerConnection:Disconnect()
+            laggerConnection = nil
+        end
+    end
+end
+
+-- ==============================
+-- KEYBIND (z.B. die Taste "G")
+-- ==============================
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.G then -- Hier kannst du die Taste ändern
+        toggleLagger()
+    end
+end)
+
+print("🔥 SERVER-LAGGER MIT KEYBIND GELADEN!")
+print("📌 Drücke die Taste 'G', um den Lagger ein- oder auszuschalten.")
+print("⚠️ EXTREM RISKANT - NUR AUF WEGWERF-ACCOUNTS VERWENDEN!")
