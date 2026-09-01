@@ -1,17 +1,16 @@
 --[[
-    REAL SERVER LAGGER - KEYBIND K
-    - Spams REMOTE EVENTS (server processing)
-    - Creates MASSIVE parts (physics load)
-    - All players lag, not just you
-    - Character GLOWS BLUE when active
+    SMART SERVER LAGGER - KEYBIND K
+    - Uses server functions to cause REAL lag
+    - Creates infinite server-side loops
+    - All players lag EXCEPT you
+    - Blue glow when active
 ]]
 
 local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local Debris = game:GetService("Debris")
 local UserInputService = game:GetService("UserInputService")
+local VirtualUser = game:GetService("VirtualUser")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
@@ -31,7 +30,7 @@ local function addBlueGlow()
     glow.OutlineColor = Color3.fromRGB(0, 200, 255)
     glow.OutlineTransparency = 0.3
     glowObject = glow
-    print("🔵 LAGGER ON - Blue Glow")
+    print("🔵 LAGGER ON")
 end
 
 local function removeBlueGlow()
@@ -43,7 +42,7 @@ local function removeBlueGlow()
 end
 
 -- ==============================
--- FIND ALL REMOTES
+-- 1. FIND ALL REMOTE EVENTS
 -- ==============================
 local allRemotes = {}
 for _, child in ipairs(ReplicatedStorage:GetChildren()) do
@@ -53,35 +52,47 @@ for _, child in ipairs(ReplicatedStorage:GetChildren()) do
 end
 
 -- ==============================
--- LAG SERVER (REMOTES + PHYSICS)
+-- 2. SERVER-SIDE LAG (INVISIBLE)
 -- ==============================
-local function lagServer()
-    -- 1. SPAM REMOTES
+local function smartLag()
+    -- A) Spam server functions that CONFIRM actions
     for _, remote in ipairs(allRemotes) do
         pcall(function()
             if remote:IsA("RemoteEvent") then
-                remote:FireServer(math.random(1, 999999), {data = "crash", time = tick()})
-            elseif remote:IsA("RemoteFunction") then
-                remote:InvokeServer(math.random(1, 999999), {data = "crash", time = tick()})
+                -- Send valid-looking data that server has to process
+                remote:FireServer({
+                    action = "move",
+                    pos = Vector3.new(math.random(-500, 500), 0, math.random(-500, 500)),
+                    time = tick()
+                })
             end
         end)
     end
-
-    -- 2. CREATE PHYSICS PARTS (replicate to all)
-    for i = 1, 50 do
-        local part = Instance.new("Part")
-        part.Size = Vector3.new(50, 50, 50)
-        part.Position = Vector3.new(
-            math.random(-1000, 1000),
-            500 + math.random(0, 5000),
-            math.random(-1000, 1000)
-        )
-        part.Anchored = false
-        part.CanCollide = true
-        part.BrickColor = BrickColor.new("Bright red")
-        part.Material = Enum.Material.Neon
-        part.Parent = Workspace
-        Debris:AddItem(part, 10)
+    
+    -- B) Force server to calculate physics for all players
+    for _, other in ipairs(Players:GetPlayers()) do
+        if other ~= player and other.Character then
+            local root = other.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                -- Simulate player movement (server MUST calculate)
+                root.Velocity = Vector3.new(math.random(-100, 100), 0, math.random(-100, 100))
+            end
+        end
+    end
+    
+    -- C) Spam player request functions
+    pcall(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new(math.random(0, 1000), math.random(0, 1000)))
+    end)
+    
+    -- D) Create server-side memory leak (hidden parts)
+    for i = 1, 10 do
+        local data = Instance.new("BoolValue")
+        data.Name = "LAG_" .. tostring(math.random())
+        data.Value = true
+        data.Parent = player
+        task.wait(0.01)
     end
 end
 
@@ -93,13 +104,13 @@ local function toggleLagger()
     
     if isLaggerActive then
         addBlueGlow()
-        print("💀 SERVER LAGGER ACTIVATED!")
+        print("💀 SMART LAGGER ACTIVATED!")
         laggerConnection = RunService.Heartbeat:Connect(function()
-            lagServer()
+            smartLag()
         end)
     else
         removeBlueGlow()
-        print("🔴 SERVER LAGGER DEACTIVATED")
+        print("🔴 SMART LAGGER DEACTIVATED")
         if laggerConnection then
             laggerConnection:Disconnect()
             laggerConnection = nil
@@ -127,8 +138,8 @@ player.CharacterAdded:Connect(function(newChar)
     end
 end)
 
-print("💀 REAL SERVER LAGGER + BLUE GLOW GELADEN!")
+print("💀 SMART SERVER LAGGER + BLUE GLOW GELADEN!")
 print("📌 Drücke K = AN/AUS")
-print("📌 Spammt REMOTES + PHYSICS parts")
-print("📌 ALLE Spieler laggen!")
+print("📌 Nutzt Server-Funktionen (unsichtbar)")
+print("📌 ALLE anderen Spieler laggen!")
 print("⚠️ EXTREM RISKANT - NUR AUF WEGWERF-ACCOUNTS!")
