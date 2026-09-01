@@ -1,7 +1,8 @@
 --[[
-    TANK GAME - DESYNC WITH RESET
+    TANK GAME - CLEAN DESYNC + SPEED TOGGLE
     L = Reset + Desync
     P = Toggle Desync ON/OFF
+    B = Toggle Speed 50 ON/OFF
     Green glow when Desync is ON
 ]]
 
@@ -13,15 +14,17 @@ local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
 
 -- ==============================
 -- STATUS
 -- ==============================
 local desyncActive = false
+local speedActive = false
 local glowObject = nil
 
 -- ==============================
--- GREEN GLOW FUNCTION
+-- GREEN GLOW
 -- ==============================
 local function addGreenGlow()
     if glowObject then return end
@@ -33,22 +36,23 @@ local function addGreenGlow()
     glow.OutlineColor = Color3.fromRGB(0, 255, 0)
     glow.OutlineTransparency = 0.5
     glowObject = glow
-    print("🟢 Desync ON (Green Glow)")
+    print("🟢 Desync ON")
 end
 
 local function removeGreenGlow()
     if glowObject then
         glowObject:Destroy()
         glowObject = nil
-        print("🔴 Desync OFF (Glow removed)")
+        print("🔴 Desync OFF")
     end
 end
 
 -- ==============================
--- DESYNC LOOP
+-- CLEAN DESYNC (smoother movement)
 -- ==============================
 local desyncOffset = Vector3.new(0, 0, 0)
 local desyncConnection = nil
+local targetOffset = Vector3.new(0, 0, 0)
 
 local function startDesync()
     if desyncConnection then return end
@@ -57,12 +61,17 @@ local function startDesync()
         if not desyncActive then return end
         if not rootPart or not rootPart.Parent then return end
         
-        local target = Vector3.new(
-            math.random(-200, 200) / 100,
-            math.random(-40, 40) / 100,
-            math.random(-200, 200) / 100
+        -- Generate new target offset (smoother, less random)
+        targetOffset = Vector3.new(
+            math.random(-100, 100) / 100,
+            math.random(-20, 20) / 100,
+            math.random(-100, 100) / 100
         )
-        desyncOffset = desyncOffset:Lerp(target, 0.1)
+        
+        -- Smooth interpolation (cleaner movement)
+        desyncOffset = desyncOffset:Lerp(targetOffset, 0.25)
+        
+        -- Apply offset with minimal rotation
         rootPart.CFrame = rootPart.CFrame + desyncOffset
     end)
 end
@@ -90,6 +99,21 @@ local function toggleDesync()
 end
 
 -- ==============================
+-- TOGGLE SPEED (B KEY)
+-- ==============================
+local function toggleSpeed()
+    speedActive = not speedActive
+    
+    if speedActive then
+        humanoid.WalkSpeed = 50
+        print("🟢 Speed ON (50)")
+    else
+        humanoid.WalkSpeed = 16
+        print("🔴 Speed OFF (16)")
+    end
+end
+
+-- ==============================
 -- RESET + DESYNC (L KEY)
 -- ==============================
 local function resetAndDesync()
@@ -109,6 +133,7 @@ local function resetAndDesync()
     local newChar = player.CharacterAdded:Wait()
     character = newChar
     rootPart = character:WaitForChild("HumanoidRootPart")
+    humanoid = character:WaitForChild("Humanoid")
     
     -- 4. Desync aktivieren
     desyncActive = true
@@ -131,6 +156,10 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if input.KeyCode == Enum.KeyCode.P then
         toggleDesync()
     end
+    
+    if input.KeyCode == Enum.KeyCode.B then
+        toggleSpeed()
+    end
 end)
 
 -- ==============================
@@ -139,10 +168,12 @@ end)
 player.CharacterAdded:Connect(function(newChar)
     character = newChar
     rootPart = character:WaitForChild("HumanoidRootPart")
+    humanoid = character:WaitForChild("Humanoid")
     print("🔄 Character respawned")
 end)
 
-print("🎯 DESYNC SCRIPT GELADEN!")
+print("🎯 CLEAN DESYNC + SPEED SCRIPT GELADEN!")
 print("📌 L = Reset + Desync")
 print("📌 P = Toggle Desync ON/OFF")
+print("📌 B = Toggle Speed 50 ON/OFF")
 print("📌 Green Glow wenn Desync ON")
