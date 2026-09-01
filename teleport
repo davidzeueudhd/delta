@@ -1,39 +1,307 @@
--- Teleport + GUI helper (replaces previous teleport helper)
--- This file exposes helper functions to _G and creates a loadstring GUI that interacts
--- with the main auto-collector script. Place this alongside your main script so the
--- GUI can call the main functions via _G.
+-- 🥚 STEAL AN EGG - COMPLETE AUTO COLLECTOR
+-- Fully functional egg detection, collection, and auto-return system
 
--- NOTE: This file assumes the following functions/vars exist in the main script's
--- environment (they are not defined here):
--- gatherEggParts, safeTeleportTo, attemptCollectPart, startAuto, stopAuto,
--- populateList, updateStatus, running, PER_EGG_TIMEOUT, RETURN_AFTER_EACH,
--- MOVE_TO_FALLBACK
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
 
--- Expose helpers so the GUI code inside loadstring can call them:
+-- ============================================================
+-- CONFIG
+-- ============================================================
+local CONFIG = {
+    AutoReturnDelay = 1,
+    GrabAttempts = 3,
+    ClickDelay = 0.1,
+    ScanInterval = 2,
+}
+
+local running = false
+local autoMode = false
+local currentBase = nil
+local baseMarker = nil
+
+-- ============================================================
+-- HELPERS
+-- ============================================================
+local function GetRoot()
+    local char = LocalPlayer.Character
+    if not char then return nil end
+    return char:FindFirstChild("HumanoidRootPart")
+end
+
+local function TeleportTo(pos)
+    local root = GetRoot()
+    if not root then return false end
+    root.CFrame = CFrame.new(pos)
+    return true
+end
+
+-- ============================================================
+-- CORE FUNCTION: Gather all stealable eggs
+-- ============================================================
+local function gatherEggParts()
+    local eggList = {}
+    
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            local name = (obj.Name or ""):lower()
+            
+            -- Must contain "egg" or "nest" in name
+            if name:find("egg") or name:find("nest") then
+                -- CRITICAL: Must have ClickDetector to be stealable
+                if obj:FindFirstChild("ClickDetector") then
+                    table.insert(eggList, obj)
+                end
+            end
+        end
+    end
+    
+    return eggList
+end
+
+-- ============================================================
+-- FIND BEST EGG (by rarity + proximity scoring)
+-- ============================================================
+local function FindBestEgg()
+    local root = GetRoot()
+    if not root then return nil end
+    
+    local eggs = gatherEggParts()
+    if #eggs == 0 then return nil end
+    
+    local bestEgg = nil
+    local bestScore = -math.huge
+    
+    local rarityValues = {
+        ["secret"] = 1000,
+        ["eternal"] = 900,
+        ["divine"] = 850,
+        ["godly"] = 700,
+        ["mythic"] = 600,
+        ["cosmic"] = 500,
+        ["rainbow"] = 450,
+        ["golden"] = 400,
+        ["legendary"] = 350,
+        ["epic"] = 250,
+        ["rare"] = 150,
+        ["uncommon"] = 50,
+        ["common"] = 10,
+    }
+    
+    for _, egg in ipairs(eggs) do
+        local score = 0
+        local name = egg.Name:lower()
+        
+        -- Rarity scoring
+        for rarity, points in pairs(rarityValues) do
+            if name:find(rarity) then
+                score = score + points
+                break
+            end
+        end
+        
+        -- Distance penalty (closer = better)
+        local dist = (egg.Position - root.Position).Magnitude
+        score = score - (dist / 50)
+        
+        if score > bestScore then
+            bestScore = score
+            bestEgg = egg
+        end
+    end
+    
+    return bestEgg, bestScore
+end
+
+-- ============================================================
+-- GRAB EGG (with multiple fallback methods)
+-- ============================================================
+local function GrabEgg(egg)
+    if not egg or not egg:IsA("BasePart") then return false end
+    local grabbed = false
+    
+    -- Method 1: ClickDetector (primary method for Steal an Egg)
+    local clickDetector = egg:FindFirstChild("ClickDetector")
+    if clickDetector then
+        clickDetector:FireClick(LocalPlayer)
+        grabbed = true
+        print("✅ Grabbed via ClickDetector")
+    end
+    
+    -- Method 2: ProximityPrompt (fallback)
+    if not grabbed then
+        local prompt = egg:FindFirstChild("ProximityPrompt")
+        if prompt then
+            prompt:InputHoldStart(LocalPlayer, Enum.UserInputType.MouseButton1)
+            task.wait(0.2)
+            prompt:InputHoldEnd(LocalPlayer, Enum.UserInputType.MouseButton1)
+            grabbed = true
+            print("✅ Grabbed via ProximityPrompt")
+        end
+    end
+    
+    -- Method 3: RemoteEvent (fallback)
+    if not grabbed then
+        local replicatedStorage = game:GetService("ReplicatedStorage")
+        local remote = replicatedStorage:FindFirstChild("CollectEgg") or replicatedStorage:FindFirstChild("GrabEgg")
+        if remote then
+            remote:FireServer(egg)
+            grabbed = true
+            print("✅ Grabbed via RemoteEvent")
+        end
+    end
+    
+    return grabbed
+end
+
+-- ============================================================
+-- SET BASE
+-- ============================================================
+local function SetBase()
+    local root = GetRoot()
+    if not root then return end
+    
+    currentBase = root.Position
+    
+    if baseMarker then baseMarker:Destroy() end
+    
+    local marker = Instance.new("Part")
+    marker.Name = "BaseMarker"
+    marker.Size = Vector3.new(6, 1, 6)
+    marker.Position = currentBase
+    marker.Anchored = true
+    marker.CanCollide = false
+    marker.Transparency = 0.2
+    marker.Color = Color3.fromRGB(0, 255, 100)
+    marker.Material = Enum.Material.Neon
+    marker.Parent = Workspace
+    
+    local glow = Instance.new("PointLight")
+    glow.Color = Color3.fromRGB(0, 255, 100)
+    glow.Brightness = 5
+    glow.Range = 25
+    glow.Parent = marker
+    
+    baseMarker = marker
+    print("🏠 Base set!")
+end
+
+local function TeleportToBase()
+    if not currentBase then
+        print("❌ Base not set!")
+        return false
+    end
+    return TeleportTo(currentBase + Vector3.new(0, 2, 0))
+end
+
+-- ============================================================
+-- STEAL & RETURN CYCLE
+-- ============================================================
+local function StealBestEgg()
+    local egg, score = FindBestEgg()
+    if not egg then
+        print("❌ No egg found!")
+        return false
+    end
+    
+    print("🚀 Teleporting to: " .. egg.Name .. " (Score: " .. math.floor(score) .. ")")
+    TeleportTo(egg.Position + Vector3.new(0, 3, 0))
+    task.wait(0.3)
+    
+    print("🔄 Attempting to grab...")
+    local grabbed = false
+    for attempt = 1, CONFIG.GrabAttempts do
+        if GrabEgg(egg) then
+            grabbed = true
+            break
+        end
+        task.wait(CONFIG.ClickDelay)
+    end
+    
+    if not grabbed then
+        print("⚠️ Manual click may be needed!")
+    end
+    
+    print("⏳ Waiting " .. CONFIG.AutoReturnDelay .. "s...")
+    task.wait(CONFIG.AutoReturnDelay)
+    
+    if currentBase then
+        TeleportToBase()
+        print("🏠 Returned to base!")
+    end
+    
+    return grabbed
+end
+
+-- ============================================================
+-- AUTO MODE
+-- ============================================================
+local autoConnection = nil
+
+local function StartAutoMode()
+    if autoConnection then autoConnection:Disconnect() end
+    autoMode = true
+    running = false
+    print("🔄 AUTO MODE ACTIVE!")
+    
+    autoConnection = RunService.Heartbeat:Connect(function()
+        if not autoMode or running then return end
+        running = true
+        StealBestEgg()
+        running = false
+    end)
+end
+
+local function StopAutoMode()
+    autoMode = false
+    if autoConnection then
+        autoConnection:Disconnect()
+        autoConnection = nil
+    end
+    print("⏹️ AUTO MODE OFF!")
+end
+
+-- ============================================================
+-- STATUS UPDATE
+-- ============================================================
+local function updateStatus(msg)
+    print("Status: " .. msg)
+end
+
+local function populateList()
+    return gatherEggParts()
+end
+
+-- ============================================================
+-- EXPOSE TO GLOBAL
+-- ============================================================
 _G.gatherEggParts = gatherEggParts
-_G.safeTeleportTo = safeTeleportTo
-_G.attemptCollectPart = attemptCollectPart
-_G.startAuto = startAuto
-_G.stopAuto = stopAuto
+_G.safeTeleportTo = TeleportTo
+_G.attemptCollectPart = GrabEgg
+_G.startAuto = StartAutoMode
+_G.stopAuto = StopAutoMode
 _G.populateList = populateList
 _G.updateStatus = updateStatus
 _G.isRunning = function() return running end
-_G.getPER_EGG_TIMEOUT = function() return PER_EGG_TIMEOUT end
-_G.setPER_EGG_TIMEOUT = function(v) PER_EGG_TIMEOUT = tonumber(v) or PER_EGG_TIMEOUT end
-_G.getRETURN_AFTER_EACH = function() return RETURN_AFTER_EACH end
-_G.setRETURN_AFTER_EACH = function(v) RETURN_AFTER_EACH = not not v end
-_G.getMOVE_TO_FALLBACK = function() return MOVE_TO_FALLBACK end
-_G.setMOVE_TO_FALLBACK = function(v) MOVE_TO_FALLBACK = not not v end
+_G.getPER_EGG_TIMEOUT = function() return CONFIG.AutoReturnDelay end
+_G.setPER_EGG_TIMEOUT = function(v) CONFIG.AutoReturnDelay = tonumber(v) or CONFIG.AutoReturnDelay end
+_G.getRETURN_AFTER_EACH = function() return true end
+_G.setRETURN_AFTER_EACH = function(v) end
+_G.getMOVE_TO_FALLBACK = function() return false end
+_G.setMOVE_TO_FALLBACK = function(v) end
 
--- GUI code as a string to be run with loadstring
+-- ============================================================
+-- GUI CODE
+-- ============================================================
 local guiCode = [[
--- GUI code (executed via loadstring). It uses _G.* helpers above.
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Clean up any previous GUI
+-- Clean up old GUI
 local existing = PlayerGui:FindFirstChild("AutoEggGUI")
 if existing then existing:Destroy() end
 
@@ -44,279 +312,318 @@ gui.Parent = PlayerGui
 
 local function makeFrame()
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 420, 0, 420)
+    frame.Size = UDim2.new(0, 400, 0, 500)
     frame.Position = UDim2.new(0, 20, 0, 60)
-    frame.BackgroundColor3 = Color3.fromRGB(30,30,35)
+    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
     frame.BorderSizePixel = 0
     frame.Name = "MainFrame"
+    frame.Active = true
+    frame.Draggable = true
     frame.Parent = gui
 
-    local corner = Instance.new("UICorner"); corner.CornerRadius = UDim.new(0,10); corner.Parent = frame
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = frame
 
+    -- Title
     local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, -12, 0, 28)
-    title.Position = UDim2.new(0, 6, 0, 6)
-    title.BackgroundTransparency = 1
-    title.Text = "Auto Egg Collector (Loadstring GUI)"
-    title.TextColor3 = Color3.fromRGB(230,230,230)
+    title.Size = UDim2.new(1, 0, 0, 35)
+    title.BackgroundColor3 = Color3.fromRGB(255, 180, 50)
+    title.BackgroundTransparency = 0.2
+    title.Text = "🥚 AUTO EGG COLLECTOR"
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
     title.Font = Enum.Font.GothamBold
-    title.TextSize = 18
-    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.TextSize = 16
     title.Parent = frame
 
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 12)
+    titleCorner.Parent = title
+
+    -- Status
     local status = Instance.new("TextLabel")
     status.Name = "StatusLabel"
-    status.Size = UDim2.new(1, -12, 0, 20)
-    status.Position = UDim2.new(0, 6, 0, 36)
+    status.Size = UDim2.new(1, -12, 0, 25)
+    status.Position = UDim2.new(0, 6, 0, 42)
     status.BackgroundTransparency = 1
-    status.Text = "Status: Stopped"
-    status.TextColor3 = Color3.fromRGB(200,200,200)
-    status.Font = Enum.Font.Gotham
+    status.Text = "🟢 Ready"
+    status.TextColor3 = Color3.fromRGB(0, 255, 100)
+    status.Font = Enum.Font.GothamBold
     status.TextSize = 14
-    status.TextXAlignment = Enum.TextXAlignment.Left
     status.Parent = frame
 
-    local startBtn = Instance.new("TextButton")
-    startBtn.Size = UDim2.new(0, 110, 0, 32)
-    startBtn.Position = UDim2.new(0, 8, 0, 64)
-    startBtn.BackgroundColor3 = Color3.fromRGB(50,180,60)
-    startBtn.Text = "Start"
-    startBtn.Font = Enum.Font.GothamBold
-    startBtn.Parent = frame
+    -- Egg count
+    local eggCount = Instance.new("TextLabel")
+    eggCount.Name = "EggCount"
+    eggCount.Size = UDim2.new(1, -12, 0, 20)
+    eggCount.Position = UDim2.new(0, 6, 0, 70)
+    eggCount.BackgroundTransparency = 1
+    eggCount.Text = "Eggs found: 0"
+    eggCount.TextColor3 = Color3.fromRGB(200, 200, 200)
+    eggCount.Font = Enum.Font.Gotham
+    eggCount.TextSize = 13
+    eggCount.Parent = frame
 
-    local stopBtn = Instance.new("TextButton")
-    stopBtn.Size = UDim2.new(0, 110, 0, 32)
-    stopBtn.Position = UDim2.new(0, 126, 0, 64)
-    stopBtn.BackgroundColor3 = Color3.fromRGB(200,60,60)
-    stopBtn.Text = "Stop"
-    stopBtn.Font = Enum.Font.GothamBold
-    stopBtn.Parent = frame
+    -- Buttons row 1
+    local scanBtn = Instance.new("TextButton")
+    scanBtn.Size = UDim2.new(0.3, -4, 0, 35)
+    scanBtn.Position = UDim2.new(0, 6, 0, 98)
+    scanBtn.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
+    scanBtn.Text = "🔍 SCAN"
+    scanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    scanBtn.Font = Enum.Font.GothamBold
+    scanBtn.TextSize = 12
+    scanBtn.BorderSizePixel = 0
+    scanBtn.Parent = frame
 
-    local refreshBtn = Instance.new("TextButton")
-    refreshBtn.Size = UDim2.new(0, 110, 0, 32)
-    refreshBtn.Position = UDim2.new(0, 244, 0, 64)
-    refreshBtn.BackgroundColor3 = Color3.fromRGB(80,120,200)
-    refreshBtn.Text = "Scan Now"
-    refreshBtn.Font = Enum.Font.GothamBold
-    refreshBtn.Parent = frame
+    local scanCorner = Instance.new("UICorner")
+    scanCorner.CornerRadius = UDim.new(0, 8)
+    scanCorner.Parent = scanBtn
 
-    -- toggles
-    local toggleFrame = Instance.new("Frame"); toggleFrame.Size = UDim2.new(1, -12, 0, 40); toggleFrame.Position = UDim2.new(0,6,0,102); toggleFrame.BackgroundTransparency = 1; toggleFrame.Parent = frame
-    local function makeToggle(name, x, getter, setter)
-        local lbl = Instance.new("TextLabel")
-        lbl.Size = UDim2.new(0, 160, 1, 0)
-        lbl.Position = UDim2.new(0, x, 0, 0)
-        lbl.BackgroundTransparency = 1
-        lbl.Text = name
-        lbl.TextColor3 = Color3.fromRGB(200,200,200)
-        lbl.Font = Enum.Font.Gotham
-        lbl.TextSize = 14
-        lbl.TextXAlignment = Enum.TextXAlignment.Left
-        lbl.Parent = toggleFrame
+    local tpBtn = Instance.new("TextButton")
+    tpBtn.Size = UDim2.new(0.3, -4, 0, 35)
+    tpBtn.Position = UDim2.new(0.35, 0, 0, 98)
+    tpBtn.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
+    tpBtn.Text = "🚀 TP"
+    tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tpBtn.Font = Enum.Font.GothamBold
+    tpBtn.TextSize = 12
+    tpBtn.BorderSizePixel = 0
+    tpBtn.Parent = frame
 
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0, 60, 0, 24)
-        btn.Position = UDim2.new(0, x + 162, 0, 8)
-        btn.Text = getter() and "ON" or "OFF"
-        btn.BackgroundColor3 = getter() and Color3.fromRGB(80,200,100) or Color3.fromRGB(160,160,160)
-        btn.Font = Enum.Font.GothamBold
-        btn.Parent = toggleFrame
+    local tpCorner = Instance.new("UICorner")
+    tpCorner.CornerRadius = UDim.new(0, 8)
+    tpCorner.Parent = tpBtn
 
-        btn.MouseButton1Click:Connect(function()
-            setter(not getter())
-            btn.Text = getter() and "ON" or "OFF"
-            btn.BackgroundColor3 = getter() and Color3.fromRGB(80,200,100) or Color3.fromRGB(160,160,160)
-        end)
-    end
+    local stealBtn = Instance.new("TextButton")
+    stealBtn.Size = UDim2.new(0.3, -4, 0, 35)
+    stealBtn.Position = UDim2.new(0.7, 0, 0, 98)
+    stealBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    stealBtn.Text = "🥚 STEAL"
+    stealBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    stealBtn.Font = Enum.Font.GothamBold
+    stealBtn.TextSize = 12
+    stealBtn.BorderSizePixel = 0
+    stealBtn.Parent = frame
 
-    makeToggle("Return After Each", 0, _G.getRETURN_AFTER_EACH, _G.setRETURN_AFTER_EACH)
-    makeToggle("Use MoveTo (walk)", 220, _G.getMOVE_TO_FALLBACK, _G.setMOVE_TO_FALLBACK)
+    local stealCorner = Instance.new("UICorner")
+    stealCorner.CornerRadius = UDim.new(0, 8)
+    stealCorner.Parent = stealBtn
 
-    -- timeout controls
-    local timeoutLabel = Instance.new("TextLabel")
-    timeoutLabel.Size = UDim2.new(0, 180, 0, 28)
-    timeoutLabel.Position = UDim2.new(0, 6, 0, 150)
-    timeoutLabel.BackgroundTransparency = 1
-    timeoutLabel.Text = "Per-egg timeout (sec): " .. tostring(_G.getPER_EGG_TIMEOUT())
-    timeoutLabel.TextColor3 = Color3.fromRGB(200,200,200)
-    timeoutLabel.Font = Enum.Font.Gotham
-    timeoutLabel.TextSize = 14
-    timeoutLabel.TextXAlignment = Enum.TextXAlignment.Left
-    timeoutLabel.Parent = frame
+    -- Buttons row 2
+    local autoBtn = Instance.new("TextButton")
+    autoBtn.Size = UDim2.new(0.48, -3, 0, 35)
+    autoBtn.Position = UDim2.new(0, 6, 0, 140)
+    autoBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    autoBtn.Text = "⏹️ AUTO: OFF"
+    autoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    autoBtn.Font = Enum.Font.GothamBold
+    autoBtn.TextSize = 12
+    autoBtn.BorderSizePixel = 0
+    autoBtn.Parent = frame
 
-    local decBtn = Instance.new("TextButton")
-    decBtn.Size = UDim2.new(0, 32, 0, 24)
-    decBtn.Position = UDim2.new(0, 190, 0, 150)
-    decBtn.Text = "-"
-    decBtn.Font = Enum.Font.GothamBold
-    decBtn.Parent = frame
+    local autoCorner = Instance.new("UICorner")
+    autoCorner.CornerRadius = UDim.new(0, 8)
+    autoCorner.Parent = autoBtn
 
-    local incBtn = Instance.new("TextButton")
-    incBtn.Size = UDim2.new(0, 32, 0, 24)
-    incBtn.Position = UDim2.new(0, 226, 0, 150)
-    incBtn.Text = "+"
-    incBtn.Font = Enum.Font.GothamBold
-    incBtn.Parent = frame
+    local baseBtn = Instance.new("TextButton")
+    baseBtn.Size = UDim2.new(0.48, -3, 0, 35)
+    baseBtn.Position = UDim2.new(0.52, 0, 0, 140)
+    baseBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+    baseBtn.Text = "🏠 SET BASE"
+    baseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    baseBtn.Font = Enum.Font.GothamBold
+    baseBtn.TextSize = 12
+    baseBtn.BorderSizePixel = 0
+    baseBtn.Parent = frame
 
-    local function refreshTimeoutLabel()
-        timeoutLabel.Text = "Per-egg timeout (sec): " .. tostring(_G.getPER_EGG_TIMEOUT())
-    end
-    decBtn.MouseButton1Click:Connect(function()
-        _G.setPER_EGG_TIMEOUT(math.max(1, _G.getPER_EGG_TIMEOUT() - 1))
-        refreshTimeoutLabel()
-    end)
-    incBtn.MouseButton1Click:Connect(function()
-        _G.setPER_EGG_TIMEOUT(_G.getPER_EGG_TIMEOUT() + 1)
-        refreshTimeoutLabel()
-    end)
+    local baseCorner = Instance.new("UICorner")
+    baseCorner.CornerRadius = UDim.new(0, 8)
+    baseCorner.Parent = baseBtn
 
-    -- list
+    -- Egg list
     local listFrame = Instance.new("Frame")
-    listFrame.Size = UDim2.new(1, -12, 0, 200)
-    listFrame.Position = UDim2.new(0, 6, 0, 190)
-    listFrame.BackgroundColor3 = Color3.fromRGB(28,30,35)
+    listFrame.Size = UDim2.new(1, -12, 0, 260)
+    listFrame.Position = UDim2.new(0, 6, 0, 182)
+    listFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
     listFrame.BorderSizePixel = 0
     listFrame.Parent = frame
-    local listCorner = Instance.new("UICorner"); listCorner.CornerRadius = UDim.new(0,8); listCorner.Parent = listFrame
+
+    local listCorner = Instance.new("UICorner")
+    listCorner.CornerRadius = UDim.new(0, 8)
+    listCorner.Parent = listFrame
 
     local scroll = Instance.new("ScrollingFrame")
-    scroll.Size = UDim2.new(1,0,1,0)
+    scroll.Size = UDim2.new(1, 0, 1, 0)
     scroll.BackgroundTransparency = 1
     scroll.BorderSizePixel = 0
-    scroll.ScrollBarThickness = 8
+    scroll.ScrollBarThickness = 6
     scroll.Parent = listFrame
 
-    local uiList = Instance.new("UIListLayout"); uiList.Parent = scroll; uiList.SortOrder = Enum.SortOrder.LayoutOrder; uiList.Padding = UDim.new(0,6)
+    local uiList = Instance.new("UIListLayout")
+    uiList.Parent = scroll
+    uiList.SortOrder = Enum.SortOrder.LayoutOrder
+    uiList.Padding = UDim.new(0, 4)
 
-    -- helper to populate from main script's gatherEggParts
-    local function populate()
+    local function RefreshList()
         for _, c in ipairs(scroll:GetChildren()) do
-            if c:IsA("TextButton") or c:IsA("TextLabel") then c:Destroy() end
+            if c:IsA("TextButton") then c:Destroy() end
         end
+
         local parts = {}
         local ok, res = pcall(function() return _G.gatherEggParts() end)
         if ok and res then parts = res end
+
         if #parts == 0 then
             local lbl = Instance.new("TextLabel")
-            lbl.Size = UDim2.new(1, -12, 0, 28)
-            lbl.Position = UDim2.new(0, 6, 0, 6)
+            lbl.Size = UDim2.new(1, -10, 0, 30)
             lbl.BackgroundTransparency = 1
-            lbl.Text = "No eggs found"
-            lbl.TextColor3 = Color3.fromRGB(200,200,200)
+            lbl.Text = "❌ No eggs found\nPress SCAN to refresh"
+            lbl.TextColor3 = Color3.fromRGB(200, 100, 100)
             lbl.Font = Enum.Font.Gotham
+            lbl.TextSize = 12
             lbl.Parent = scroll
+            eggCount.Text = "Eggs found: 0"
             return
         end
+
+        eggCount.Text = "Eggs found: " .. #parts
+
         local charRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        local count = 0
-        for _, p in ipairs(parts) do
-            count = count + 1
+
+        for i, p in ipairs(parts) do
             local dist = charRoot and math.floor((p.Position - charRoot.Position).Magnitude) or 0
+
             local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(1, -12, 0, 30)
-            btn.Position = UDim2.new(0, 6, 0, 6 + (count-1) * 36)
-            btn.BackgroundColor3 = Color3.fromRGB(40,40,45)
-            btn.TextColor3 = Color3.fromRGB(230,230,230)
-            btn.Text = p.Name .. " (" .. tostring(dist) .. " studs)"
+            btn.Size = UDim2.new(1, -10, 0, 28)
+            btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+            btn.TextColor3 = Color3.fromRGB(230, 230, 230)
+            btn.Text = "  " .. p.Name .. " (" .. dist .. "m)"
             btn.Font = Enum.Font.Gotham
+            btn.TextSize = 11
+            btn.TextXAlignment = Enum.TextXAlignment.Left
+            btn.BorderSizePixel = 0
             btn.Parent = scroll
 
-            local tpBtn = Instance.new("TextButton")
-            tpBtn.Size = UDim2.new(0, 60, 0, 24)
-            tpBtn.Position = UDim2.new(1, -72, 0, 3 + (count-1) * 36)
-            tpBtn.AnchorPoint = Vector2.new(0,0)
-            tpBtn.Text = "TP"
-            tpBtn.BackgroundColor3 = Color3.fromRGB(80,120,200)
-            tpBtn.Font = Enum.Font.GothamBold
-            tpBtn.Parent = listFrame
-
-            tpBtn.MouseButton1Click:Connect(function()
-                pcall(function() _G.safeTeleportTo(p.Position + Vector3.new(0,5,0)) end)
-            end)
+            local btnCorner = Instance.new("UICorner")
+            btnCorner.CornerRadius = UDim.new(0, 6)
+            btnCorner.Parent = btn
 
             btn.MouseButton1Click:Connect(function()
-                -- try to walk first using main script's logic via MoveTo by calling startAuto temporarily? Instead just teleport for manual click
-                pcall(function() _G.safeTeleportTo(p.Position + Vector3.new(0,5,0)) end)
+                pcall(function() _G.safeTeleportTo(p.Position + Vector3.new(0, 3, 0)) end)
+                status.Text = "✅ Teleported!"
+                status.TextColor3 = Color3.fromRGB(0, 255, 100)
+                task.wait(2)
+                status.Text = "🟢 Ready"
             end)
         end
     end
 
-    -- button actions
-    startBtn.MouseButton1Click:Connect(function()
-        pcall(function() _G.startAuto() end)
-    end)
-    stopBtn.MouseButton1Click:Connect(function()
-        pcall(function() _G.stopAuto() end)
-    end)
-    refreshBtn.MouseButton1Click:Connect(function()
-        populate()
-        local statusLbl = frame:FindFirstChild("StatusLabel")
-        if statusLbl then statusLbl.Text = "Status: Refreshed" end
+    -- Button events
+    scanBtn.MouseButton1Click:Connect(function()
+        status.Text = "🔍 Scanning..."
+        status.TextColor3 = Color3.fromRGB(255, 200, 0)
+        RefreshList()
+        status.Text = "✅ Scanned!"
+        status.TextColor3 = Color3.fromRGB(0, 255, 100)
+        task.wait(1)
+        status.Text = "🟢 Ready"
     end)
 
-    -- expose update UI function for status update from main script
-    local function refreshStatusFromMain()
-        local statusLbl = frame:FindFirstChild("StatusLabel")
-        if statusLbl then
-            local ok, s = pcall(function() return _G and _G.updateStatus and _G.updateStatus end)
-            -- main script calls updateStatus as usual; this GUI will be refreshed periodically below
+    tpBtn.MouseButton1Click:Connect(function()
+        status.Text = "🚀 Teleporting..."
+        status.TextColor3 = Color3.fromRGB(100, 200, 255)
+        local egg = _G.FindBestEgg and _G.FindBestEgg()
+        if egg then
+            pcall(function() _G.safeTeleportTo(egg.Position + Vector3.new(0, 3, 0)) end)
+            status.Text = "✅ Teleported!"
+            status.TextColor3 = Color3.fromRGB(0, 255, 100)
+        else
+            status.Text = "❌ No egg!"
+            status.TextColor3 = Color3.fromRGB(255, 100, 100)
         end
-    end
+        task.wait(2)
+        status.Text = "🟢 Ready"
+    end)
 
-    -- allow dragging
-    local dragging, dragStart, startPos
-    frame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            startPos = frame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
+    stealBtn.MouseButton1Click:Connect(function()
+        status.Text = "🥚 Stealing..."
+        status.TextColor3 = Color3.fromRGB(255, 200, 0)
+        pcall(function() _G.StealBestEgg and _G.StealBestEgg() end)
+        status.Text = "✅ Complete!"
+        status.TextColor3 = Color3.fromRGB(0, 255, 100)
+        task.wait(2)
+        status.Text = "🟢 Ready"
+    end)
+
+    autoBtn.MouseButton1Click:Connect(function()
+        if _G.autoMode then
+            pcall(function() _G.stopAuto() end)
+            autoBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+            autoBtn.Text = "⏹️ AUTO: OFF"
+            status.Text = "🟢 Ready"
+            status.TextColor3 = Color3.fromRGB(0, 255, 100)
+        else
+            pcall(function() _G.startAuto() end)
+            autoBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+            autoBtn.Text = "▶️ AUTO: ON"
+            status.Text = "🔄 Auto mode!"
+            status.TextColor3 = Color3.fromRGB(255, 200, 0)
         end
     end)
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - dragStart
-            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
+
+    baseBtn.MouseButton1Click:Connect(function()
+        pcall(function() _G.SetBase and _G.SetBase() end)
+        status.Text = "✅ Base set!"
+        status.TextColor3 = Color3.fromRGB(0, 255, 100)
+        task.wait(2)
+        status.Text = "🟢 Ready"
     end)
 
     return {
         frame = frame,
-        populate = populate,
-        refreshTimeoutLabel = refreshTimeoutLabel,
-        statusLabel = status
+        refresh = RefreshList,
+        status = status
     }
 end
 
 local widgets = makeFrame()
-widgets.populate()
+widgets.refresh()
 
--- periodic refresh
+-- Periodic refresh
 spawn(function()
     while gui.Parent do
         pcall(function()
-            widgets.populate()
-            -- update status label if main script sets one via _G.updateStatus by reading the label text from the main script's value (we rely on updateStatus being called there)
-            local ok, s = pcall(function() return nil end)
+            if widgets.frame.Visible then
+                widgets.refresh()
+            end
         end)
-        wait(6)
+        wait(5)
     end
 end)
 
--- toggle show/hide with R
+-- Toggle with R
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == Enum.KeyCode.R then
-        local f = gui:FindFirstChild("MainFrame")
-        if f then f.Visible = not f.Visible end
+        widgets.frame.Visible = not widgets.frame.Visible
     end
 end)
+
+print("✅ GUI Loaded! Press R to toggle")
 ]]
 
--- Run the GUI string
+-- Expose functions for GUI
+_G.FindBestEgg = FindBestEgg
+_G.StealBestEgg = StealBestEgg
+_G.SetBase = SetBase
+_G.autoMode = autoMode
+
+-- Run GUI
 local success, err = pcall(function() loadstring(guiCode)() end)
 if not success then
-    warn("[AutoEgg GUI] loadstring failed:", err)
+    warn("❌ GUI Error:", err)
+else
+    print("✅ AutoEgg Loaded! Press R to toggle GUI")
+    print("📌 Commands: SCAN • TP • STEAL • AUTO • SET BASE")
 end
