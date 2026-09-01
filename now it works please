@@ -1,0 +1,148 @@
+--[[
+    TANK GAME - DESYNC WITH RESET
+    L = Reset + Desync
+    P = Toggle Desync ON/OFF
+    Green glow when Desync is ON
+]]
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+-- ==============================
+-- STATUS
+-- ==============================
+local desyncActive = false
+local glowObject = nil
+
+-- ==============================
+-- GREEN GLOW FUNCTION
+-- ==============================
+local function addGreenGlow()
+    if glowObject then return end
+    
+    local glow = Instance.new("Highlight")
+    glow.Parent = character
+    glow.FillColor = Color3.fromRGB(0, 255, 0)
+    glow.FillTransparency = 0.3
+    glow.OutlineColor = Color3.fromRGB(0, 255, 0)
+    glow.OutlineTransparency = 0.5
+    glowObject = glow
+    print("🟢 Desync ON (Green Glow)")
+end
+
+local function removeGreenGlow()
+    if glowObject then
+        glowObject:Destroy()
+        glowObject = nil
+        print("🔴 Desync OFF (Glow removed)")
+    end
+end
+
+-- ==============================
+-- DESYNC LOOP
+-- ==============================
+local desyncOffset = Vector3.new(0, 0, 0)
+local desyncConnection = nil
+
+local function startDesync()
+    if desyncConnection then return end
+    
+    desyncConnection = RunService.Heartbeat:Connect(function()
+        if not desyncActive then return end
+        if not rootPart or not rootPart.Parent then return end
+        
+        local target = Vector3.new(
+            math.random(-200, 200) / 100,
+            math.random(-40, 40) / 100,
+            math.random(-200, 200) / 100
+        )
+        desyncOffset = desyncOffset:Lerp(target, 0.1)
+        rootPart.CFrame = rootPart.CFrame + desyncOffset
+    end)
+end
+
+local function stopDesync()
+    if desyncConnection then
+        desyncConnection:Disconnect()
+        desyncConnection = nil
+    end
+end
+
+-- ==============================
+-- TOGGLE DESYNC (P KEY)
+-- ==============================
+local function toggleDesync()
+    desyncActive = not desyncActive
+    
+    if desyncActive then
+        addGreenGlow()
+        startDesync()
+    else
+        removeGreenGlow()
+        stopDesync()
+    end
+end
+
+-- ==============================
+-- RESET + DESYNC (L KEY)
+-- ==============================
+local function resetAndDesync()
+    if not character then return end
+    
+    -- 1. Desync ausschalten
+    if desyncActive then
+        desyncActive = false
+        removeGreenGlow()
+        stopDesync()
+    end
+    
+    -- 2. Character killen (respawn)
+    character.Humanoid.Health = 0
+    
+    -- 3. Auf Respawn warten
+    local newChar = player.CharacterAdded:Wait()
+    character = newChar
+    rootPart = character:WaitForChild("HumanoidRootPart")
+    
+    -- 4. Desync aktivieren
+    desyncActive = true
+    addGreenGlow()
+    startDesync()
+    
+    print("🔄 Reset + Desync aktiviert!")
+end
+
+-- ==============================
+-- KEYBINDS
+-- ==============================
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.L then
+        resetAndDesync()
+    end
+    
+    if input.KeyCode == Enum.KeyCode.P then
+        toggleDesync()
+    end
+end)
+
+-- ==============================
+-- CHARACTER RESET
+-- ==============================
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    rootPart = character:WaitForChild("HumanoidRootPart")
+    print("🔄 Character respawned")
+end)
+
+print("🎯 DESYNC SCRIPT GELADEN!")
+print("📌 L = Reset + Desync")
+print("📌 P = Toggle Desync ON/OFF")
+print("📌 Green Glow wenn Desync ON")
