@@ -1,0 +1,345 @@
+--[[
+    Script Name: Auto-Egg Collector (Public)
+    Description: Scans for eggs, shows them in a GUI, teleports to selected egg,
+    and auto-collects. No admin restrictions – works for everyone.
+]]
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+-- ============================================================
+--  CONFIG
+-- ============================================================
+local CONFIG = {
+    AutoCollect = true,
+    CollectTimeout = 3, -- seconds to wait before teleporting back / next action
+}
+
+-- ============================================================
+--  EGG FINDER
+-- ============================================================
+local function FindEggs()
+    local eggs = {}
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") or obj:IsA("Model") then
+            local name = (obj.Name or ""):lower()
+            if name:find("egg") or name:find("nest") then
+                -- exclude treadmills
+                if not name:find("treadmill") and not name:find("laufband") then
+                    table.insert(eggs, obj)
+                end
+            end
+        end
+    end
+    return eggs
+end
+
+-- ============================================================
+--  TELEPORT FUNCTION
+-- ============================================================
+local function TeleportTo(part)
+    if not part or not part:IsA("BasePart") then return end
+    local char = LocalPlayer.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    root.CFrame = CFrame.new(part.Position + Vector3.new(0, 2, 0))
+end
+
+-- ============================================================
+--  COLLECT EGG
+-- ============================================================
+local function CollectEgg(egg)
+    if not egg then return false end
+    local grabbed = false
+    
+    -- Method 1: ClickDetector
+    local clickDetector = egg:FindFirstChild("ClickDetector")
+    if clickDetector then
+        clickDetector:FireClick(LocalPlayer)
+        grabbed = true
+        print("✅ Clicked egg")
+    end
+    
+    -- Method 2: Touch
+    if not grabbed then
+        local char = LocalPlayer.Character
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    egg.Touched:Fire(part)
+                end
+            end
+            grabbed = true
+            print("✅ Touched egg")
+        end
+    end
+    
+    -- Method 3: ProximityPrompt
+    if not grabbed then
+        local prompt = egg:FindFirstChild("ProximityPrompt")
+        if prompt then
+            prompt:InputHoldEnd(LocalPlayer, Enum.UserInputType.MouseButton1)
+            grabbed = true
+            print("✅ Used ProximityPrompt")
+        end
+    end
+    
+    return grabbed
+end
+
+-- ============================================================
+--  GUI
+-- ============================================================
+local function CreateGUI()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "EggCollector"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 360, 0, 400)
+    frame.Position = UDim2.new(0.5, -180, 0.5, -200)
+    frame.BackgroundColor3 = Color3.fromRGB(18, 20, 28)
+    frame.BackgroundTransparency = 0.1
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.Draggable = true
+    frame.Parent = screenGui
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = frame
+    
+    -- Title
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.BackgroundColor3 = Color3.fromRGB(255, 180, 50)
+    title.BackgroundTransparency = 0.3
+    title.Text = "🥚 Auto-Egg Collector"
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.TextScaled = true
+    title.Font = Enum.Font.GothamBold
+    title.Parent = frame
+    
+    -- Status
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Size = UDim2.new(1, 0, 0, 25)
+    statusLabel.Position = UDim2.new(0, 0, 0, 45)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Text = "🔍 Scanning..."
+    statusLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
+    statusLabel.TextScaled = true
+    statusLabel.Font = Enum.Font.GothamMedium
+    statusLabel.Parent = frame
+    
+    -- Refresh Button
+    local refreshBtn = Instance.new("TextButton")
+    refreshBtn.Size = UDim2.new(0.25, 0, 0, 28)
+    refreshBtn.Position = UDim2.new(0.05, 0, 0, 78)
+    refreshBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+    refreshBtn.Text = "🔄 Refresh"
+    refreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    refreshBtn.TextScaled = true
+    refreshBtn.Font = Enum.Font.GothamBold
+    refreshBtn.BorderSizePixel = 0
+    refreshBtn.Parent = frame
+    local refreshCorner = Instance.new("UICorner")
+    refreshCorner.CornerRadius = UDim.new(0, 6)
+    refreshCorner.Parent = refreshBtn
+    
+    -- Auto Collect Toggle
+    local autoLabel = Instance.new("TextLabel")
+    autoLabel.Size = UDim2.new(0.45, 0, 0, 26)
+    autoLabel.Position = UDim2.new(0.55, 0, 0, 79)
+    autoLabel.BackgroundTransparency = 1
+    autoLabel.Text = "Auto-Collect:"
+    autoLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    autoLabel.TextScaled = true
+    autoLabel.Font = Enum.Font.GothamMedium
+    autoLabel.TextXAlignment = Enum.TextXAlignment.Left
+    autoLabel.Parent = frame
+    
+    local autoBtn = Instance.new("TextButton")
+    autoBtn.Size = UDim2.new(0.2, 0, 0, 24)
+    autoBtn.Position = UDim2.new(0.8, 0, 0, 80)
+    autoBtn.BackgroundColor3 = CONFIG.AutoCollect and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+    autoBtn.Text = CONFIG.AutoCollect and "ON" or "OFF"
+    autoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    autoBtn.TextScaled = true
+    autoBtn.Font = Enum.Font.GothamBold
+    autoBtn.BorderSizePixel = 0
+    autoBtn.Parent = frame
+    local autoCorner = Instance.new("UICorner")
+    autoCorner.CornerRadius = UDim.new(0, 6)
+    autoCorner.Parent = autoBtn
+    
+    -- Egg List Frame
+    local listFrame = Instance.new("Frame")
+    listFrame.Size = UDim2.new(1, -10, 0, 220)
+    listFrame.Position = UDim2.new(0, 5, 0, 120)
+    listFrame.BackgroundColor3 = Color3.fromRGB(30, 32, 40)
+    listFrame.BackgroundTransparency = 0.5
+    listFrame.BorderSizePixel = 0
+    listFrame.Parent = frame
+    local listCorner = Instance.new("UICorner")
+    listCorner.CornerRadius = UDim.new(0, 8)
+    listCorner.Parent = listFrame
+    
+    local scrollFrame = Instance.new("ScrollingFrame")
+    scrollFrame.Size = UDim2.new(1, 0, 1, 0)
+    scrollFrame.BackgroundTransparency = 1
+    scrollFrame.BorderSizePixel = 0
+    scrollFrame.ScrollBarThickness = 6
+    scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(255, 180, 50)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scrollFrame.Parent = listFrame
+    
+    -- Close Button
+    local close = Instance.new("TextButton")
+    close.Size = UDim2.new(0, 25, 0, 25)
+    close.Position = UDim2.new(1, -35, 0, 6)
+    close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    close.Text = "✕"
+    close.TextColor3 = Color3.fromRGB(255, 255, 255)
+    close.TextScaled = true
+    close.Font = Enum.Font.GothamBold
+    close.BorderSizePixel = 0
+    close.Parent = frame
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 8)
+    closeCorner.Parent = close
+    
+    close.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
+        print("❌ GUI closed")
+    end)
+    
+    -- ============================================================
+    --  UPDATE EGG LIST
+    -- ============================================================
+    local function UpdateEggList()
+        -- Clear old buttons
+        for _, child in ipairs(scrollFrame:GetChildren()) do
+            if child:IsA("TextButton") then child:Destroy() end
+        end
+        
+        local eggs = FindEggs()
+        if #eggs == 0 then
+            local lbl = Instance.new("TextLabel")
+            lbl.Size = UDim2.new(1, 0, 0, 30)
+            lbl.Position = UDim2.new(0, 0, 0, 5)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = "❌ No eggs found"
+            lbl.TextColor3 = Color3.fromRGB(255, 100, 100)
+            lbl.TextScaled = true
+            lbl.Font = Enum.Font.GothamMedium
+            lbl.Parent = scrollFrame
+            scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 50)
+            statusLabel.Text = "❌ No eggs found"
+            statusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+            return
+        end
+        
+        statusLabel.Text = "✅ Found " .. #eggs .. " eggs"
+        statusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+        
+        -- Sort by distance (optional)
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            table.sort(eggs, function(a, b)
+                if a:IsA("BasePart") and b:IsA("BasePart") then
+                    return (a.Position - root.Position).Magnitude < (b.Position - root.Position).Magnitude
+                end
+                return false
+            end)
+        end
+        
+        local yPos = 5
+        for _, egg in ipairs(eggs) do
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -10, 0, 30)
+            btn.Position = UDim2.new(0, 5, 0, yPos)
+            btn.BackgroundColor3 = Color3.fromRGB(50, 52, 60)
+            btn.Text = egg.Name
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.TextScaled = true
+            btn.Font = Enum.Font.GothamMedium
+            btn.BorderSizePixel = 0
+            btn.Parent = scrollFrame
+            local btnCorner = Instance.new("UICorner")
+            btnCorner.CornerRadius = UDim.new(0, 6)
+            btnCorner.Parent = btn
+            
+            -- Click to teleport
+            btn.MouseButton1Click:Connect(function()
+                TeleportTo(egg)
+                print("📍 Teleported to " .. egg.Name)
+                -- If auto-collect is on, try to collect after teleport
+                if CONFIG.AutoCollect then
+                    task.wait(0.5)
+                    local grabbed = CollectEgg(egg)
+                    if grabbed then
+                        print("✅ Collected " .. egg.Name)
+                        -- Remove from list? We'll refresh later.
+                    else
+                        print("⚠️ Could not collect " .. egg.Name)
+                    end
+                end
+            end)
+            
+            yPos = yPos + 35
+        end
+        scrollFrame.CanvasSize = UDim2.new(0, 0, 0, yPos + 10)
+    end
+    
+    -- ============================================================
+    --  BUTTON EVENTS
+    -- ============================================================
+    refreshBtn.MouseButton1Click:Connect(function()
+        UpdateEggList()
+    end)
+    
+    autoBtn.MouseButton1Click:Connect(function()
+        CONFIG.AutoCollect = not CONFIG.AutoCollect
+        autoBtn.BackgroundColor3 = CONFIG.AutoCollect and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+        autoBtn.Text = CONFIG.AutoCollect and "ON" or "OFF"
+    end)
+    
+    -- Initial update
+    UpdateEggList()
+    
+    -- Auto-refresh every 10 seconds
+    RunService.Heartbeat:Connect(function()
+        if frame.Visible then
+            -- refresh every ~10 seconds
+            local t = tick()
+            if not frame._lastRefresh or (t - frame._lastRefresh) > 10 then
+                frame._lastRefresh = t
+                UpdateEggList()
+            end
+        end
+    end)
+    
+    -- Toggle GUI with R
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == Enum.KeyCode.R then
+            frame.Visible = not frame.Visible
+        end
+    end)
+    
+    print("✅ Egg Collector GUI loaded! Press R to toggle.")
+end
+
+-- ============================================================
+--  START
+-- ============================================================
+task.wait(0.5)
+CreateGUI()
+print("🥚 Auto-Egg Collector ready!")
