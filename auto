@@ -1,0 +1,434 @@
+-- Auto Egg Collector (LocalScript, public)
+-- Place: StarterPlayer > StarterPlayerScripts (Studio/testing use in places you own)
+-- Features: GUI, Auto-Steal toggle, returns player to previous spot, handles respawn.
+
+local Players = game:GetService("Players")
+local CollectionService = game:GetService("CollectionService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Workspace = workspace
+
+local LocalPlayer = Players.LocalPlayer
+if not LocalPlayer then return end
+
+-- CONFIG
+local TELEPORT_OFFSET = Vector3.new(0, 3, 0)   -- safe offset above egg
+local PER_EGG_TIMEOUT = 3                      -- seconds to wait for server collection
+local AUTO_SCAN_INTERVAL = 1.0                 -- seconds between auto scan passes
+local GUI_REFRESH_INTERVAL = 8                 -- seconds to refresh GUI list
+local MAX_LIST_ITEMS = 200
+local RETURN_AFTER_EACH = true                 -- return to original place after each egg attempt
+local MOVE_TO_FALLBACK = true                  -- if teleport doesn't work, try Humanoid:MoveTo
+
+-- UTILITIES
+local function resolveToPart(inst)
+    if not inst then return nil end
+    if inst:IsA("BasePart") then return inst end
+    if inst:IsA("Model") then
+        if inst.PrimaryPart and inst.PrimaryPart:IsA("BasePart") then return inst.PrimaryPart end
+        return inst:FindFirstChildWhichIsA("BasePart")
+    end
+    return nil
+end
+
+local function isEggCandidate(inst)
+    if not inst then return false end
+    local name = (inst.Name or ""):lower()
+    if name:find("egg") or name:find("nest") then
+        if name:find("treadmill") or name:find("laufband") then return false end
+        return true
+    end
+    local ok, has = pcall(function() return CollectionService:HasTag(inst, "Egg") end)
+    if ok and has then return true end
+    if inst:FindFirstChild("IsEgg") or inst:FindFirstChild("Egg") then return true end
+    if inst:FindFirstChildOfClass("ProximityPrompt") and name:find("egg") then return true end
+    return false
+end
+
+local function gatherEggParts()
+    local list = {}
+
+    -- CollectionService tag "Egg"
+    local ok, tagged = pcall(function() return CollectionService:GetTagged("Egg") end)
+    if ok and tagged then
+        for _, v in ipairs(tagged) do
+            local p = resolveToPart(v)
+            if p and p:IsDescendantOf(Workspace) then table.insert(list, p) end
+        end
+    end
+
+    -- Workspace.Biomes.*.Eggs pattern
+    local biomes = Workspace:FindFirstChild("Biomes")
+    if biomes then
+        for _, biome in ipairs(biomes:GetChildren()) do
+            local folder = biome:FindFirstChild("Eggs") or biome:FindFirstChild("eggs")
+            if folder then
+                for _, desc in ipairs(folder:GetDescendants()) do
+                    if desc:IsA("BasePart") then table.insert(list, desc)
+                    elseif desc:IsA("Model") then
+                        local p = resolveToPart(desc)
+                        if p then table.insert(list, p) end
+                    end
+                end
+            end
+        end
+    end
+
+    -- Global name-based scan
+    for _, inst in ipairs(Workspace:GetDescendants()) do
+        if (inst:IsA("BasePart") or inst:IsA("Model")) and inst.Parent then
+            if isEggCandidate(inst) then
+                local p = resolveToPart(inst)
+                if p and p:IsDescendantOf(Workspace) then table.insert(list, p) end
+            end
+        end
+    end
+
+    -- dedupe
+    local seen = {}
+    local unique = {}
+    for _, p in ipairs(list) do
+        if p and p:IsDescendantOf(Workspace) and not seen[p] then
+            seen[p] = true
+            table.insert(unique, p)
+        end
+    end
+
+    return unique
+end
+
+local function isCollected(part)
+    if not part then return true end
+    if not part.Parent then return true end
+    if not part:IsDescendantOf(Workspace) then return true end
+    local ok, tagged = pcall(function() return CollectionService:GetTagged("Egg") end)
+    if ok and tagged then
+        for _, t in ipairs(tagged) do
+            if t == part or t == part.Parent then return false end
+        end
+        -- not in tag list -> likely collected
+    end
+    return false
+end
+
+-- track character
+local currentCharacter = LocalPlayer.Character
+local currentRoot = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
+local currentHumanoid = currentCharacter and currentCharacter:FindFirstChildWhichIsA("Humanoid")
+local characterChanged = false
+
+LocalPlayer.CharacterAdded:Connect(function(ch)
+    currentCharacter = ch
+    currentRoot = ch:WaitForChild("HumanoidRootPart", 5)
+    currentHumanoid = ch:FindFirstChildWhichIsA("Humanoid")
+    characterChanged = true
+    task.wait(0.2)
+    characterChanged = false
+end)
+
+-- Safe teleport that tries to avoid server movement-detection side-effects
+local function safeTeleportTo(pos)
+    if not currentCharacter or not currentRoot then return false end
+    local hum = currentHumanoid
+    pcall(function()
+        if hum then hum.PlatformStand = true end
+        -- zero velocity if possible
+        if currentRoot and currentRoot:IsA("BasePart") then
+            pcall(function() currentRoot.Velocity = Vector3.new(0,0,0) end)
+        end
+        currentRoot.CFrame = CFrame.new(pos)
+        task.wait(0.06)
+        if hum then hum.PlatformStand = false end
+    end)
+    return true
+end
+
+local function attemptCollectPart(part)
+    if not part or not part.Parent then return false end
+    if not currentCharacter or not currentRoot then return false end
+
+    -- save return location
+    local beforeCFrame = currentRoot and currentRoot.CFrame or nil
+
+    -- 1) Teleport just above the part
+    safeTeleportTo(part.Position + TELEPORT_OFFSET)
+    -- wait quickly for server to process
+    local start = os.clock()
+    while os.clock() - start < PER_EGG_TIMEOUT do
+        if isCollected(part) then
+            if RETURN_AFTER_EACH and beforeCFrame and currentRoot then
+                pcall(safeTeleportTo, beforeCFrame.p)
+            end
+            return true
+        end
+        -- if character respawned, abort
+        if characterChanged then break end
+        task.wait(0.12)
+    end
+
+    -- 2) Try MoveTo fallback (walk there) if allowed
+    if MOVE_TO_FALLBACK and currentHumanoid and part.Position then
+        local ok, err = pcall(function()
+            currentHumanoid:MoveTo(part.Position + Vector3.new(0, 1, 0))
+        end)
+        if ok then
+            local movedStart = os.clock()
+            local reached = false
+            local movedConn
+            movedConn = currentHumanoid.MoveToFinished:Connect(function(reachedArg)
+                reached = reachedArg
+            end)
+            while os.clock() - movedStart < PER_EGG_TIMEOUT do
+                if isCollected(part) then
+                    if movedConn then movedConn:Disconnect() end
+                    if RETURN_AFTER_EACH and beforeCFrame and currentRoot then
+                        pcall(safeTeleportTo, beforeCFrame.p)
+                    end
+                    return true
+                end
+                if reached then break end
+                if characterChanged then break end
+                task.wait(0.12)
+            end
+            if movedConn then movedConn:Disconnect() end
+        end
+    end
+
+    -- 3) Try teleport slightly higher and give server more time
+    safeTeleportTo(part.Position + Vector3.new(0, 6, 0))
+    start = os.clock()
+    while os.clock() - start < PER_EGG_TIMEOUT do
+        if isCollected(part) then
+            if RETURN_AFTER_EACH and beforeCFrame and currentRoot then
+                pcall(safeTeleportTo, beforeCFrame.p)
+            end
+            return true
+        end
+        if characterChanged then break end
+        task.wait(0.12)
+    end
+
+    -- restore original position if still present
+    if RETURN_AFTER_EACH and beforeCFrame and currentRoot then
+        pcall(safeTeleportTo, beforeCFrame.p)
+    end
+
+    return isCollected(part)
+end
+
+-- ========== GUI ==========
+local gui = Instance.new("ScreenGui")
+gui.Name = "AutoEggGUI"
+gui.ResetOnSpawn = false
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 360, 0, 380)
+frame.Position = UDim2.new(0, 20, 0, 60)
+frame.BackgroundColor3 = Color3.fromRGB(30,30,35)
+frame.BorderSizePixel = 0
+frame.Parent = gui
+
+local corner = Instance.new("UICorner"); corner.CornerRadius = UDim.new(0,10); corner.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -12, 0, 28)
+title.Position = UDim2.new(0, 6, 0, 6)
+title.BackgroundTransparency = 1
+title.Text = "Auto Egg Collector"
+title.TextColor3 = Color3.fromRGB(230,230,230)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = frame
+
+local status = Instance.new("TextLabel")
+status.Size = UDim2.new(1, -12, 0, 20)
+status.Position = UDim2.new(0, 6, 0, 36)
+status.BackgroundTransparency = 1
+status.Text = "Status: Stopped"
+status.TextColor3 = Color3.fromRGB(200,200,200)
+status.Font = Enum.Font.Gotham
+status.TextSize = 14
+status.TextXAlignment = Enum.TextXAlignment.Left
+status.Parent = frame
+
+local startBtn = Instance.new("TextButton")
+startBtn.Size = UDim2.new(0, 110, 0, 32)
+startBtn.Position = UDim2.new(0, 8, 0, 64)
+startBtn.BackgroundColor3 = Color3.fromRGB(50,180,60)
+startBtn.Text = "Start"
+startBtn.Font = Enum.Font.GothamBold
+startBtn.Parent = frame
+
+local stopBtn = Instance.new("TextButton")
+stopBtn.Size = UDim2.new(0, 110, 0, 32)
+stopBtn.Position = UDim2.new(0, 126, 0, 64)
+stopBtn.BackgroundColor3 = Color3.fromRGB(200,60,60)
+stopBtn.Text = "Stop"
+stopBtn.Font = Enum.Font.GothamBold
+stopBtn.Parent = frame
+
+local refreshBtn = Instance.new("TextButton")
+refreshBtn.Size = UDim2.new(0, 110, 0, 32)
+refreshBtn.Position = UDim2.new(0, 244, 0, 64)
+refreshBtn.BackgroundColor3 = Color3.fromRGB(80,120,200)
+refreshBtn.Text = "Scan Now"
+refreshBtn.Font = Enum.Font.GothamBold
+refreshBtn.Parent = frame
+
+local listFrame = Instance.new("Frame")
+listFrame.Size = UDim2.new(1, -10, 0, 250)
+listFrame.Position = UDim2.new(0, 5, 0, 108)
+listFrame.BackgroundColor3 = Color3.fromRGB(28,30,35)
+listFrame.BorderSizePixel = 0
+listFrame.Parent = frame
+
+local listCorner = Instance.new("UICorner"); listCorner.CornerRadius = UDim.new(0,8); listCorner.Parent = listFrame
+
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(1,0,1,0)
+scroll.BackgroundTransparency = 1
+scroll.BorderSizePixel = 0
+scroll.ScrollBarThickness = 6
+scroll.Parent = listFrame
+
+local uiList = Instance.new("UIListLayout"); uiList.Parent = scroll; uiList.SortOrder = Enum.SortOrder.LayoutOrder; uiList.Padding = UDim.new(0,6)
+
+-- manual drag replacement
+local dragging, dragStart, startPos
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+local function clearList()
+    for _, c in ipairs(scroll:GetChildren()) do
+        if c:IsA("TextButton") or c:IsA("TextLabel") then c:Destroy() end
+    end
+end
+
+local function populateList(parts)
+    clearList()
+    if #parts == 0 then
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, -12, 0, 28)
+        lbl.Position = UDim2.new(0, 6, 0, 6)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = "No eggs found"
+        lbl.TextColor3 = Color3.fromRGB(200,200,200)
+        lbl.Font = Enum.Font.Gotham
+        lbl.Parent = scroll
+        return
+    end
+
+    local charRoot = currentRoot
+    local count = 0
+    for _, p in ipairs(parts) do
+        if count >= MAX_LIST_ITEMS then break end
+        count = count + 1
+        local dist = charRoot and math.floor((p.Position - charRoot.Position).Magnitude) or 0
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, -12, 0, 30)
+        btn.Position = UDim2.new(0, 6, 0, 6 + (count-1) * 36)
+        btn.BackgroundColor3 = Color3.fromRGB(40,40,45)
+        btn.TextColor3 = Color3.fromRGB(230,230,230)
+        btn.Text = p.Name .. " (" .. tostring(dist) .. " studs)"
+        btn.Font = Enum.Font.Gotham
+        btn.Parent = scroll
+
+        btn.MouseButton1Click:Connect(function()
+            safeTeleportTo(p.Position + Vector3.new(0,5,0))
+        end)
+    end
+end
+
+-- AUTO COLLECT
+local running = false
+local autoTask = nil
+
+local function updateStatus(txt)
+    status.Text = "Status: " .. tostring(txt)
+end
+
+local function singleCollectPass()
+    local parts = gatherEggParts()
+    populateList(parts)
+    if #parts == 0 then
+        updateStatus("No eggs found")
+        return
+    end
+    for _, part in ipairs(parts) do
+        if not running then break end
+        if not (part and part:IsDescendantOf(Workspace)) then
+            -- skip
+        else
+            updateStatus("Collecting: " .. part.Name)
+            local ok, collected = pcall(attemptCollectPart, part)
+            if ok and collected then
+                updateStatus("Collected: " .. part.Name)
+            else
+                updateStatus("Failed/Timed out: " .. part.Name)
+            end
+            task.wait(0.25)
+        end
+    end
+end
+
+local function startAuto()
+    if running then return end
+    running = true
+    updateStatus("Running")
+    autoTask = task.spawn(function()
+        while running do
+            singleCollectPass()
+            if running then task.wait(AUTO_SCAN_INTERVAL) end
+        end
+        updateStatus("Stopped")
+    end)
+end
+
+local function stopAuto()
+    running = false
+end
+
+-- EVENTS
+startBtn.MouseButton1Click:Connect(function() startAuto() end)
+stopBtn.MouseButton1Click:Connect(function() stopAuto() end)
+refreshBtn.MouseButton1Click:Connect(function()
+    populateList(gatherEggParts())
+    updateStatus("Refreshed")
+end)
+
+-- periodic GUI refresh
+task.spawn(function()
+    while gui.Parent do
+        if frame.Visible then
+            populateList(gatherEggParts())
+        end
+        task.wait(GUI_REFRESH_INTERVAL)
+    end
+end)
+
+-- toggle show/hide with R
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.R then frame.Visible = not frame.Visible end
+end)
+
+-- initial populate
+populateList(gatherEggParts())
+updateStatus("Stopped")
+print("[AutoEgg] Public GUI loaded. Press R to hide/show. Start to begin.")
