@@ -1,0 +1,479 @@
+--[[
+    Roblox Script: Fly, Noclip & WalkSpeed Controller
+    Features:
+    - Fly (toggle with customizable speed)
+    - Noclip (toggle)
+    - WalkSpeed (adjustable up to 200)
+    - Simple and clean GUI
+    - Anti-detection measures (property spoofing, remote blocking)
+]]
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- ============================================================
+--  SETTINGS
+-- ============================================================
+local Settings = {
+    FlyEnabled = false,
+    FlySpeed = 50,
+    NoclipEnabled = false,
+    WalkSpeed = 16,
+}
+
+-- ============================================================
+--  ANTI-DETECTION (Property Spoofing, Remote Blocking)
+-- ============================================================
+local function setupAntiDetection()
+    -- Block suspicious remote events that might be used by anti-cheat
+    local function blockRemote(remote)
+        if remote:IsA("RemoteEvent") then
+            local oldFire = remote.FireServer
+            remote.FireServer = function(...)
+                -- Block known anti-cheat remotes
+                if remote.Name:lower():find("antihack") or remote.Name:lower():find("anticheat") or remote.Name:lower():find("report") then
+                    return
+                end
+                return oldFire(...)
+            end
+        end
+    end
+
+    -- Search and block suspicious remotes
+    local function scanAndBlock(parent)
+        for _, child in ipairs(parent:GetChildren()) do
+            blockRemote(child)
+            if child:IsA("Folder") or child:IsA("Model") then
+                scanAndBlock(child)
+            end
+        end
+    end
+
+    -- Start scanning from ReplicatedStorage
+    local replicatedStorage = game:GetService("ReplicatedStorage")
+    if replicatedStorage then
+        scanAndBlock(replicatedStorage)
+    end
+
+    -- Property spoofing: Override WalkSpeed checks
+    local mt = getrawmetatable and getrawmetatable(game) or getmetatable(game)
+    if mt then
+        local oldNamecall = mt.__namecall
+        mt.__namecall = function(self, ...)
+            local args = {...}
+            local method = tostring(args[1]) or ""
+            -- If a script tries to read WalkSpeed, return the original value
+            if method:lower():find("walkspeed") then
+                local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+                if humanoid then
+                    return 16 -- Return default value to avoid detection
+                end
+            end
+            return oldNamecall and oldNamecall(self, ...)
+        end
+        setmetatable(game, mt)
+    end
+end
+
+-- ============================================================
+--  FLY SYSTEM
+-- ============================================================
+local flyConnection = nil
+local flyBodyVelocity = nil
+local flyBodyGyro = nil
+
+local function startFly()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    -- Clean up old fly parts
+    if flyBodyVelocity then flyBodyVelocity:Destroy() end
+    if flyBodyGyro then flyBodyGyro:Destroy() end
+    if flyConnection then flyConnection:Disconnect() end
+
+    flyBodyVelocity = Instance.new("BodyVelocity")
+    flyBodyVelocity.MaxForce = Vector3.new(40000, 40000, 40000)
+    flyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    flyBodyVelocity.Parent = root
+
+    flyBodyGyro = Instance.new("BodyGyro")
+    flyBodyGyro.MaxTorque = Vector3.new(40000, 40000, 40000)
+    flyBodyGyro.Parent = root
+
+    flyConnection = RunService.Heartbeat:Connect(function()
+        if not Settings.FlyEnabled then return end
+        if not root or not root.Parent then
+            stopFly()
+            return
+        end
+
+        local moveDirection = Vector3.new(0, 0, 0)
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveDirection = moveDirection + root.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveDirection = moveDirection - root.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveDirection = moveDirection - root.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveDirection = moveDirection + root.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            moveDirection = moveDirection + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+            moveDirection = moveDirection - Vector3.new(0, 1, 0)
+        end
+
+        if moveDirection.Magnitude > 0 then
+            moveDirection = moveDirection.Unit * Settings.FlySpeed
+        end
+
+        flyBodyVelocity.Velocity = moveDirection
+        flyBodyGyro.CFrame = root.CFrame
+    end)
+end
+
+local function stopFly()
+    if flyBodyVelocity then flyBodyVelocity:Destroy(); flyBodyVelocity = nil end
+    if flyBodyGyro then flyBodyGyro:Destroy(); flyBodyGyro = nil end
+    if flyConnection then flyConnection:Disconnect(); flyConnection = nil end
+end
+
+local function toggleFly()
+    Settings.FlyEnabled = not Settings.FlyEnabled
+    if Settings.FlyEnabled then
+        startFly()
+    else
+        stopFly()
+    end
+end
+
+-- ============================================================
+--  NOCLIP SYSTEM
+-- ============================================================
+local function toggleNoclip()
+    Settings.NoclipEnabled = not Settings.NoclipEnabled
+    local char = LocalPlayer.Character
+    if char then
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = not Settings.NoclipEnabled
+            end
+        end
+    end
+end
+
+-- ============================================================
+--  WALKSPEED SYSTEM
+-- ============================================================
+local function applyWalkSpeed(speed)
+    Settings.WalkSpeed = speed
+    local char = LocalPlayer.Character
+    if char then
+        local humanoid = char:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid.WalkSpeed = speed
+        end
+    end
+end
+
+-- ============================================================
+--  CHARACTER RESPAWN HANDLER
+-- ============================================================
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(0.5)
+    if Settings.FlyEnabled then startFly() end
+    if Settings.NoclipEnabled then
+        local char = LocalPlayer.Character
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end
+    applyWalkSpeed(Settings.WalkSpeed)
+end)
+
+-- ============================================================
+--  GUI CREATION
+-- ============================================================
+local function CreateGUI()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "MovementController"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 280, 0, 220)
+    frame.Position = UDim2.new(0.5, -140, 0.5, -110)
+    frame.BackgroundColor3 = Color3.fromRGB(18, 20, 28)
+    frame.BackgroundTransparency = 0.1
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.Draggable = true
+    frame.Parent = screenGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = frame
+
+    -- Title
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 35)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.BackgroundColor3 = Color3.fromRGB(255, 180, 50)
+    title.BackgroundTransparency = 0.3
+    title.Text = "🚀 Movement Controller"
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.TextScaled = true
+    title.Font = Enum.Font.GothamBold
+    title.Parent = frame
+
+    -- Fly Toggle
+    local flyLabel = Instance.new("TextLabel")
+    flyLabel.Size = UDim2.new(0.45, 0, 0, 26)
+    flyLabel.Position = UDim2.new(0.05, 0, 0, 45)
+    flyLabel.BackgroundTransparency = 1
+    flyLabel.Text = "🛫 Fly:"
+    flyLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    flyLabel.TextScaled = true
+    flyLabel.Font = Enum.Font.GothamMedium
+    flyLabel.TextXAlignment = Enum.TextXAlignment.Left
+    flyLabel.Parent = frame
+
+    local flyBtn = Instance.new("TextButton")
+    flyBtn.Size = UDim2.new(0.2, 0, 0, 24)
+    flyBtn.Position = UDim2.new(0.6, 0, 0, 46)
+    flyBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    flyBtn.Text = "OFF"
+    flyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    flyBtn.TextScaled = true
+    flyBtn.Font = Enum.Font.GothamBold
+    flyBtn.BorderSizePixel = 0
+    flyBtn.Parent = frame
+
+    local flyCorner = Instance.new("UICorner")
+    flyCorner.CornerRadius = UDim.new(0, 6)
+    flyCorner.Parent = flyBtn
+
+    -- Fly Speed Slider
+    local speedLabel = Instance.new("TextLabel")
+    speedLabel.Size = UDim2.new(0.45, 0, 0, 26)
+    speedLabel.Position = UDim2.new(0.05, 0, 0, 78)
+    speedLabel.BackgroundTransparency = 1
+    speedLabel.Text = "Fly Speed: " .. Settings.FlySpeed
+    speedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    speedLabel.TextScaled = true
+    speedLabel.Font = Enum.Font.GothamMedium
+    speedLabel.TextXAlignment = Enum.TextXAlignment.Left
+    speedLabel.Parent = frame
+
+    local speedSlider = Instance.new("Frame")
+    speedSlider.Size = UDim2.new(0.35, 0, 0, 5)
+    speedSlider.Position = UDim2.new(0.55, 0, 0, 89)
+    speedSlider.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    speedSlider.Parent = frame
+
+    local sliderCorner = Instance.new("UICorner")
+    sliderCorner.CornerRadius = UDim.new(0, 3)
+    sliderCorner.Parent = speedSlider
+
+    local speedFill = Instance.new("Frame")
+    speedFill.Size = UDim2.new((Settings.FlySpeed - 10) / 190, 0, 1, 0)
+    speedFill.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+    speedFill.Parent = speedSlider
+
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(0, 3)
+    fillCorner.Parent = speedFill
+
+    -- Noclip Toggle
+    local noclipLabel = Instance.new("TextLabel")
+    noclipLabel.Size = UDim2.new(0.45, 0, 0, 26)
+    noclipLabel.Position = UDim2.new(0.05, 0, 0, 110)
+    noclipLabel.BackgroundTransparency = 1
+    noclipLabel.Text = "🚪 Noclip:"
+    noclipLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    noclipLabel.TextScaled = true
+    noclipLabel.Font = Enum.Font.GothamMedium
+    noclipLabel.TextXAlignment = Enum.TextXAlignment.Left
+    noclipLabel.Parent = frame
+
+    local noclipBtn = Instance.new("TextButton")
+    noclipBtn.Size = UDim2.new(0.2, 0, 0, 24)
+    noclipBtn.Position = UDim2.new(0.6, 0, 0, 111)
+    noclipBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    noclipBtn.Text = "OFF"
+    noclipBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    noclipBtn.TextScaled = true
+    noclipBtn.Font = Enum.Font.GothamBold
+    noclipBtn.BorderSizePixel = 0
+    noclipBtn.Parent = frame
+
+    local noclipCorner = Instance.new("UICorner")
+    noclipCorner.CornerRadius = UDim.new(0, 6)
+    noclipCorner.Parent = noclipBtn
+
+    -- WalkSpeed Slider
+    local wsLabel = Instance.new("TextLabel")
+    wsLabel.Size = UDim2.new(0.45, 0, 0, 26)
+    wsLabel.Position = UDim2.new(0.05, 0, 0, 145)
+    wsLabel.BackgroundTransparency = 1
+    wsLabel.Text = "WalkSpeed: " .. Settings.WalkSpeed
+    wsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    wsLabel.TextScaled = true
+    wsLabel.Font = Enum.Font.GothamMedium
+    wsLabel.TextXAlignment = Enum.TextXAlignment.Left
+    wsLabel.Parent = frame
+
+    local wsSlider = Instance.new("Frame")
+    wsSlider.Size = UDim2.new(0.35, 0, 0, 5)
+    wsSlider.Position = UDim2.new(0.55, 0, 0, 156)
+    wsSlider.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    wsSlider.Parent = frame
+
+    local wsCorner = Instance.new("UICorner")
+    wsCorner.CornerRadius = UDim.new(0, 3)
+    wsCorner.Parent = wsSlider
+
+    local wsFill = Instance.new("Frame")
+    wsFill.Size = UDim2.new((Settings.WalkSpeed - 16) / 184, 0, 1, 0)
+    wsFill.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    wsFill.Parent = wsSlider
+
+    local wsFillCorner = Instance.new("UICorner")
+    wsFillCorner.CornerRadius = UDim.new(0, 3)
+    wsFillCorner.Parent = wsFill
+
+    -- Close Button
+    local close = Instance.new("TextButton")
+    close.Size = UDim2.new(0, 25, 0, 25)
+    close.Position = UDim2.new(1, -35, 0, 6)
+    close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    close.Text = "✕"
+    close.TextColor3 = Color3.fromRGB(255, 255, 255)
+    close.TextScaled = true
+    close.Font = Enum.Font.GothamBold
+    close.BorderSizePixel = 0
+    close.Parent = frame
+
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 8)
+    closeCorner.Parent = close
+
+    close.MouseButton1Click:Connect(function()
+        if Settings.FlyEnabled then toggleFly() end
+        screenGui:Destroy()
+    end)
+
+    -- ============================================================
+    --  BUTTON EVENTS
+    -- ============================================================
+
+    -- Fly Toggle
+    flyBtn.MouseButton1Click:Connect(function()
+        toggleFly()
+        flyBtn.BackgroundColor3 = Settings.FlyEnabled and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+        flyBtn.Text = Settings.FlyEnabled and "ON" or "OFF"
+    end)
+
+    -- Noclip Toggle
+    noclipBtn.MouseButton1Click:Connect(function()
+        toggleNoclip()
+        noclipBtn.BackgroundColor3 = Settings.NoclipEnabled and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+        noclipBtn.Text = Settings.NoclipEnabled and "ON" or "OFF"
+    end)
+
+    -- Fly Speed Slider
+    local speedDragging = false
+    local function updateSpeed(input)
+        local mouseX = input.Position.X
+        local sliderPos = speedSlider.AbsolutePosition.X
+        local sliderWidth = speedSlider.AbsoluteSize.X
+        local rel = math.clamp((mouseX - sliderPos) / sliderWidth, 0, 1)
+        local newSpeed = math.round(10 + rel * 190) -- range 10-200
+        speedLabel.Text = "Fly Speed: " .. newSpeed
+        speedFill.Size = UDim2.new(rel, 0, 1, 0)
+        Settings.FlySpeed = newSpeed
+    end
+
+    speedSlider.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            speedDragging = true
+            updateSpeed(input)
+        end
+    end)
+
+    speedSlider.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            speedDragging = false
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if speedDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateSpeed(input)
+        end
+    end)
+
+    -- WalkSpeed Slider
+    local wsDragging = false
+    local function updateWalkSpeed(input)
+        local mouseX = input.Position.X
+        local sliderPos = wsSlider.AbsolutePosition.X
+        local sliderWidth = wsSlider.AbsoluteSize.X
+        local rel = math.clamp((mouseX - sliderPos) / sliderWidth, 0, 1)
+        local newSpeed = math.round(16 + rel * 184) -- range 16-200
+        wsLabel.Text = "WalkSpeed: " .. newSpeed
+        wsFill.Size = UDim2.new(rel, 0, 1, 0)
+        applyWalkSpeed(newSpeed)
+    end
+
+    wsSlider.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            wsDragging = true
+            updateWalkSpeed(input)
+        end
+    end)
+
+    wsSlider.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            wsDragging = false
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if wsDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateWalkSpeed(input)
+        end
+    end)
+
+    -- Toggle GUI with R
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == Enum.KeyCode.R then
+            frame.Visible = not frame.Visible
+        end
+    end)
+
+    print("✅ Movement Controller GUI loaded! Press R to toggle.")
+end
+
+-- ============================================================
+--  INITIALIZATION
+-- ============================================================
+setupAntiDetection()
+task.wait(0.5)
+CreateGUI()
+applyWalkSpeed(Settings.WalkSpeed)
+print("🚀 Movement Controller ready!")
+print("📌 R = toggle GUI")
