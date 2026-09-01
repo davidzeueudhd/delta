@@ -1,6 +1,6 @@
 loadstring([[
 -- ============================================================
---  GUI: Fly + Click Teleport (with speed control)
+--  GUI: Fly + WalkSpeed + Teleport Points + Click Teleport
 -- ============================================================
 
 local Players = game:GetService("Players")
@@ -13,7 +13,7 @@ local LocalPlayer = Players.LocalPlayer
 -- ============================================================
 local Config = {
     FlyEnabled = false,
-    FlySpeed = 50,           -- default speed
+    WalkSpeed = 16,            -- default walkspeed
     TeleportEnabled = false,
 }
 
@@ -29,23 +29,14 @@ local function startFly(speed)
     local root = char:FindFirstChild("HumanoidRootPart")
     if not root then return end
 
-    -- Remove old fly parts
-    if flyBodyVelocity then
-        flyBodyVelocity:Destroy()
-        flyBodyVelocity = nil
-    end
-    if flyConnection then
-        flyConnection:Disconnect()
-        flyConnection = nil
-    end
+    if flyBodyVelocity then flyBodyVelocity:Destroy() end
+    if flyConnection then flyConnection:Disconnect() end
 
-    -- Create BodyVelocity to move the player
     flyBodyVelocity = Instance.new("BodyVelocity")
     flyBodyVelocity.MaxForce = Vector3.new(1, 1, 1) * 10000
     flyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
     flyBodyVelocity.Parent = root
 
-    -- Update velocity each frame based on WASD input
     flyConnection = RunService.Heartbeat:Connect(function(dt)
         if not Config.FlyEnabled then return end
         if not root or not root.Parent then
@@ -74,13 +65,13 @@ local function startFly(speed)
         end
 
         if moveDirection.Magnitude > 0 then
-            moveDirection = moveDirection.Unit * speed
+            moveDirection = moveDirection.Unit * 50 -- fly speed fixed at 50
         end
 
         flyBodyVelocity.Velocity = moveDirection
     end)
 
-    print("🛫 Fly ON (Speed: " .. speed .. ")")
+    print("🛫 Fly ON")
 end
 
 local function stopFly()
@@ -95,23 +86,26 @@ local function stopFly()
     print("🛬 Fly OFF")
 end
 
--- Toggle Fly
 local function toggleFly()
     Config.FlyEnabled = not Config.FlyEnabled
     if Config.FlyEnabled then
-        startFly(Config.FlySpeed)
+        startFly(50)
     else
         stopFly()
     end
 end
 
--- Update speed while flying
-local function updateFlySpeed(newSpeed)
-    Config.FlySpeed = newSpeed
-    if Config.FlyEnabled then
-        -- Restart fly with new speed
-        stopFly()
-        startFly(newSpeed)
+-- ============================================================
+--  WALKSPEED SYSTEM
+-- ============================================================
+local function updateWalkSpeed(speed)
+    Config.WalkSpeed = speed
+    local char = LocalPlayer.Character
+    if char then
+        local humanoid = char:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid.WalkSpeed = speed
+        end
     end
 end
 
@@ -121,11 +115,7 @@ end
 local teleportConnection = nil
 
 local function startTeleport()
-    if teleportConnection then
-        teleportConnection:Disconnect()
-        teleportConnection = nil
-    end
-
+    if teleportConnection then teleportConnection:Disconnect() end
     teleportConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         if not Config.TeleportEnabled then return end
@@ -134,21 +124,15 @@ local function startTeleport()
         local mouse = LocalPlayer:GetMouse()
         if not mouse then return end
 
-        local target = mouse.Target
         local hitPosition = mouse.Hit.Position
-
-        if not target then return end
-
         local char = LocalPlayer.Character
         if not char then return end
         local root = char:FindFirstChild("HumanoidRootPart")
         if not root then return end
 
-        -- Teleport to the click position, offset up a bit to avoid falling through floor
         root.CFrame = CFrame.new(hitPosition + Vector3.new(0, 3, 0))
         print("📍 Teleported to: " .. tostring(hitPosition))
     end)
-
     print("🖱️ Click Teleport ON")
 end
 
@@ -170,6 +154,47 @@ local function toggleTeleport()
 end
 
 -- ============================================================
+--  TELEPORT POINTS SYSTEM
+-- ============================================================
+local teleportPoints = {}
+local pointsList = {}
+
+local function savePoint(name)
+    local char = LocalPlayer.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    teleportPoints[name] = root.Position
+    print("📍 Point '" .. name .. "' saved at " .. tostring(root.Position))
+    updatePointsList()
+end
+
+local function teleportToPoint(name)
+    local pos = teleportPoints[name]
+    if not pos then
+        print("❌ Point '" .. name .. "' not found")
+        return
+    end
+    local char = LocalPlayer.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    root.CFrame = CFrame.new(pos + Vector3.new(0, 2, 0))
+    print("📍 Teleported to point '" .. name .. "'")
+end
+
+local function deletePoint(name)
+    teleportPoints[name] = nil
+    updatePointsList()
+    print("🗑️ Point '" .. name .. "' deleted")
+end
+
+local function updatePointsList()
+    -- This is called to refresh the GUI list; we'll rebuild the points frame each time
+    -- We'll handle this in the GUI creation loop
+end
+
+-- ============================================================
 --  GUI CREATION
 -- ============================================================
 local function CreateGUI()
@@ -180,8 +205,8 @@ local function CreateGUI()
 
     -- Main Frame
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 320, 0, 220)
-    frame.Position = UDim2.new(0.5, -160, 0.5, -110)
+    frame.Size = UDim2.new(0, 360, 0, 480)
+    frame.Position = UDim2.new(0.5, -180, 0.5, -240)
     frame.BackgroundColor3 = Color3.fromRGB(20, 22, 30)
     frame.BackgroundTransparency = 0.1
     frame.BorderSizePixel = 0
@@ -199,7 +224,7 @@ local function CreateGUI()
     title.Position = UDim2.new(0, 0, 0, 0)
     title.BackgroundColor3 = Color3.fromRGB(255, 180, 50)
     title.BackgroundTransparency = 0.3
-    title.Text = "🛸 Fly + Click Teleport"
+    title.Text = "🛸 Fly + Teleport Points"
     title.TextColor3 = Color3.fromRGB(255, 255, 255)
     title.TextScaled = true
     title.Font = Enum.Font.GothamBold
@@ -232,38 +257,38 @@ local function CreateGUI()
     flyCorner.CornerRadius = UDim.new(0, 6)
     flyCorner.Parent = flyBtn
 
-    -- Fly Speed Slider
-    local speedLabel = Instance.new("TextLabel")
-    speedLabel.Size = UDim2.new(0.45, 0, 0, 25)
-    speedLabel.Position = UDim2.new(0.05, 0, 0, 85)
-    speedLabel.BackgroundTransparency = 1
-    speedLabel.Text = "Speed: " .. Config.FlySpeed
-    speedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    speedLabel.TextScaled = true
-    speedLabel.Font = Enum.Font.GothamMedium
-    speedLabel.TextXAlignment = Enum.TextXAlignment.Left
-    speedLabel.Parent = frame
+    -- Walkspeed Slider
+    local wsLabel = Instance.new("TextLabel")
+    wsLabel.Size = UDim2.new(0.45, 0, 0, 25)
+    wsLabel.Position = UDim2.new(0.05, 0, 0, 85)
+    wsLabel.BackgroundTransparency = 1
+    wsLabel.Text = "Walkspeed: " .. Config.WalkSpeed
+    wsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    wsLabel.TextScaled = true
+    wsLabel.Font = Enum.Font.GothamMedium
+    wsLabel.TextXAlignment = Enum.TextXAlignment.Left
+    wsLabel.Parent = frame
 
-    local speedSlider = Instance.new("Frame")
-    speedSlider.Size = UDim2.new(0.4, 0, 0, 6)
-    speedSlider.Position = UDim2.new(0.55, 0, 0, 95)
-    speedSlider.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    speedSlider.Parent = frame
+    local wsSlider = Instance.new("Frame")
+    wsSlider.Size = UDim2.new(0.4, 0, 0, 6)
+    wsSlider.Position = UDim2.new(0.55, 0, 0, 95)
+    wsSlider.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    wsSlider.Parent = frame
 
-    local sliderCorner = Instance.new("UICorner")
-    sliderCorner.CornerRadius = UDim.new(0, 3)
-    sliderCorner.Parent = speedSlider
+    local wsCorner = Instance.new("UICorner")
+    wsCorner.CornerRadius = UDim.new(0, 3)
+    wsCorner.Parent = wsSlider
 
-    local speedFill = Instance.new("Frame")
-    speedFill.Size = UDim2.new((Config.FlySpeed - 10) / 190, 0, 1, 0) -- range 10-200
-    speedFill.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-    speedFill.Parent = speedSlider
+    local wsFill = Instance.new("Frame")
+    wsFill.Size = UDim2.new((Config.WalkSpeed - 10) / 90, 0, 1, 0) -- range 10-100
+    wsFill.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+    wsFill.Parent = wsSlider
 
-    local fillCorner = Instance.new("UICorner")
-    fillCorner.CornerRadius = UDim.new(0, 3)
-    fillCorner.Parent = speedFill
+    local wsFillCorner = Instance.new("UICorner")
+    wsFillCorner.CornerRadius = UDim.new(0, 3)
+    wsFillCorner.Parent = wsFill
 
-    -- Teleport Toggle
+    -- Teleport Click Toggle
     local teleLabel = Instance.new("TextLabel")
     teleLabel.Size = UDim2.new(0.45, 0, 0, 30)
     teleLabel.Position = UDim2.new(0.05, 0, 0, 120)
@@ -290,6 +315,71 @@ local function CreateGUI()
     teleCorner.CornerRadius = UDim.new(0, 6)
     teleCorner.Parent = teleBtn
 
+    -- Teleport Points Section
+    local pointsTitle = Instance.new("TextLabel")
+    pointsTitle.Size = UDim2.new(1, 0, 0, 25)
+    pointsTitle.Position = UDim2.new(0, 0, 0, 160)
+    pointsTitle.BackgroundTransparency = 1
+    pointsTitle.Text = "📍 Teleport Points"
+    pointsTitle.TextColor3 = Color3.fromRGB(255, 180, 50)
+    pointsTitle.TextScaled = true
+    pointsTitle.Font = Enum.Font.GothamBold
+    pointsTitle.Parent = frame
+
+    -- Input for point name
+    local pointNameBox = Instance.new("TextBox")
+    pointNameBox.Size = UDim2.new(0.5, 0, 0, 28)
+    pointNameBox.Position = UDim2.new(0.05, 0, 0, 190)
+    pointNameBox.BackgroundColor3 = Color3.fromRGB(40, 42, 50)
+    pointNameBox.Text = "point name"
+    pointNameBox.TextColor3 = Color3.fromRGB(200, 200, 200)
+    pointNameBox.TextScaled = true
+    pointNameBox.Font = Enum.Font.GothamMedium
+    pointNameBox.BorderSizePixel = 0
+    pointNameBox.Parent = frame
+
+    local nameCorner = Instance.new("UICorner")
+    nameCorner.CornerRadius = UDim.new(0, 6)
+    nameCorner.Parent = pointNameBox
+
+    -- Save Point Button
+    local saveBtn = Instance.new("TextButton")
+    saveBtn.Size = UDim2.new(0.3, 0, 0, 28)
+    saveBtn.Position = UDim2.new(0.6, 0, 0, 190)
+    saveBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    saveBtn.Text = "Save"
+    saveBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    saveBtn.TextScaled = true
+    saveBtn.Font = Enum.Font.GothamBold
+    saveBtn.BorderSizePixel = 0
+    saveBtn.Parent = frame
+
+    local saveCorner = Instance.new("UICorner")
+    saveCorner.CornerRadius = UDim.new(0, 6)
+    saveCorner.Parent = saveBtn
+
+    -- Points List Frame (scrollable)
+    local pointsFrame = Instance.new("Frame")
+    pointsFrame.Size = UDim2.new(1, -10, 0, 160)
+    pointsFrame.Position = UDim2.new(0, 5, 0, 230)
+    pointsFrame.BackgroundColor3 = Color3.fromRGB(30, 32, 40)
+    pointsFrame.BackgroundTransparency = 0.5
+    pointsFrame.BorderSizePixel = 0
+    pointsFrame.Parent = frame
+
+    local pointsCorner = Instance.new("UICorner")
+    pointsCorner.CornerRadius = UDim.new(0, 8)
+    pointsCorner.Parent = pointsFrame
+
+    local pointsListFrame = Instance.new("ScrollingFrame")
+    pointsListFrame.Size = UDim2.new(1, 0, 1, 0)
+    pointsListFrame.BackgroundTransparency = 1
+    pointsListFrame.BorderSizePixel = 0
+    pointsListFrame.ScrollBarThickness = 6
+    pointsListFrame.ScrollBarImageColor3 = Color3.fromRGB(255, 180, 50)
+    pointsListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    pointsListFrame.Parent = pointsFrame
+
     -- Close Button
     local close = Instance.new("TextButton")
     close.Size = UDim2.new(0, 25, 0, 25)
@@ -307,7 +397,6 @@ local function CreateGUI()
     closeCorner.Parent = close
 
     close.MouseButton1Click:Connect(function()
-        -- Clean up fly and teleport when closing
         if Config.FlyEnabled then toggleFly() end
         if Config.TeleportEnabled then toggleTeleport() end
         screenGui:Destroy()
@@ -315,62 +404,127 @@ local function CreateGUI()
     end)
 
     -- ============================================================
+    --  FUNCTIONS TO UPDATE POINTS LIST
+    -- ============================================================
+    local function refreshPointsList()
+        -- Clear existing buttons
+        for _, child in ipairs(pointsListFrame:GetChildren()) do
+            if child:IsA("TextButton") then
+                child:Destroy()
+            end
+        end
+
+        local yPos = 0
+        local pointNames = {}
+        for name, _ in pairs(teleportPoints) do
+            table.insert(pointNames, name)
+        end
+        table.sort(pointNames)
+
+        for _, name in ipairs(pointNames) do
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -5, 0, 28)
+            btn.Position = UDim2.new(0, 2, 0, yPos)
+            btn.BackgroundColor3 = Color3.fromRGB(50, 52, 60)
+            btn.Text = name
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.TextScaled = true
+            btn.Font = Enum.Font.GothamMedium
+            btn.BorderSizePixel = 0
+            btn.Parent = pointsListFrame
+
+            local btnCorner = Instance.new("UICorner")
+            btnCorner.CornerRadius = UDim.new(0, 6)
+            btnCorner.Parent = btn
+
+            -- Click to teleport
+            btn.MouseButton1Click:Connect(function()
+                teleportToPoint(name)
+            end)
+
+            -- Right-click to delete (optional)
+            btn.MouseButton2Click:Connect(function()
+                deletePoint(name)
+                refreshPointsList()
+            end)
+
+            yPos = yPos + 32
+        end
+
+        pointsListFrame.CanvasSize = UDim2.new(0, 0, 0, yPos + 10)
+    end
+
+    -- Save button
+    saveBtn.MouseButton1Click:Connect(function()
+        local name = pointNameBox.Text
+        if name and name ~= "" and name ~= "point name" then
+            savePoint(name)
+            refreshPointsList()
+        else
+            print("❌ Please enter a valid point name")
+        end
+    end)
+
+    -- Initial refresh
+    refreshPointsList()
+
+    -- ============================================================
     --  BUTTON EVENTS
     -- ============================================================
-
-    -- Fly Toggle
     flyBtn.MouseButton1Click:Connect(function()
         toggleFly()
         flyBtn.BackgroundColor3 = Config.FlyEnabled and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
         flyBtn.Text = Config.FlyEnabled and "ON" or "OFF"
     end)
 
-    -- Teleport Toggle
     teleBtn.MouseButton1Click:Connect(function()
         toggleTeleport()
         teleBtn.BackgroundColor3 = Config.TeleportEnabled and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
         teleBtn.Text = Config.TeleportEnabled and "ON" or "OFF"
     end)
 
-    -- Speed Slider (click and drag)
-    local dragging = false
-    local function updateSpeed(input)
+    -- Walkspeed Slider
+    local wsDragging = false
+    local function updateWalkSpeedFromSlider(input)
         local mouseX = input.Position.X
-        local sliderPos = speedSlider.AbsolutePosition.X
-        local sliderWidth = speedSlider.AbsoluteSize.X
+        local sliderPos = wsSlider.AbsolutePosition.X
+        local sliderWidth = wsSlider.AbsoluteSize.X
         local relativeX = math.clamp((mouseX - sliderPos) / sliderWidth, 0, 1)
-        local newSpeed = math.round(10 + relativeX * 190) -- range 10-200
-        speedLabel.Text = "Speed: " .. newSpeed
-        speedFill.Size = UDim2.new(relativeX, 0, 1, 0)
-        updateFlySpeed(newSpeed)
+        local newSpeed = math.round(10 + relativeX * 90) -- range 10-100
+        wsLabel.Text = "Walkspeed: " .. newSpeed
+        wsFill.Size = UDim2.new(relativeX, 0, 1, 0)
+        updateWalkSpeed(newSpeed)
     end
 
-    speedSlider.InputBegan:Connect(function(input)
+    wsSlider.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            updateSpeed(input)
+            wsDragging = true
+            updateWalkSpeedFromSlider(input)
         end
     end)
 
-    speedSlider.InputEnded:Connect(function(input)
+    wsSlider.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
+            wsDragging = false
         end
     end)
 
     UserInputService.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            updateSpeed(input)
+        if wsDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateWalkSpeedFromSlider(input)
         end
     end)
 
-    -- Toggle GUI with R key
+    -- Toggle GUI with R
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         if input.KeyCode == Enum.KeyCode.R then
             frame.Visible = not frame.Visible
         end
     end)
+
+    -- Refresh points list when points change (already done in save/delete)
+    -- Also refresh when GUI opens? We'll update on save/delete.
 
     print("✅ GUI loaded! Press R to toggle.")
 end
@@ -379,10 +533,18 @@ end
 --  HANDLE CHARACTER RESPAWN
 -- ============================================================
 LocalPlayer.CharacterAdded:Connect(function()
-    -- If fly was on, restart it after respawn
     if Config.FlyEnabled then
-        task.wait(0.5) -- wait for character to fully load
-        startFly(Config.FlySpeed)
+        task.wait(0.5)
+        startFly(50)
+    end
+    -- Apply walkspeed on respawn
+    task.wait(0.5)
+    local char = LocalPlayer.Character
+    if char then
+        local humanoid = char:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid.WalkSpeed = Config.WalkSpeed
+        end
     end
 end)
 
@@ -391,6 +553,7 @@ end)
 -- ============================================================
 task.wait(0.5)
 CreateGUI()
-print("🛸 Fly + Click Teleport GUI ready!")
+print("🛸 Fly + Teleport Points GUI ready!")
 print("📌 R = toggle GUI")
+print("📍 Right-click a point name to delete it")
 ]])()
