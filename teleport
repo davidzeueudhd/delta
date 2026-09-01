@@ -1,0 +1,105 @@
+-- Replace your CharacterAdded handler, safeTeleportTo, and attemptCollectPart with this code.
+
+-- track character (replace existing handler)
+local currentCharacter = LocalPlayer.Character
+local currentRoot = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
+local currentHumanoid = currentCharacter and currentCharacter:FindFirstChildWhichIsA("Humanoid")
+local characterChanged = false
+
+LocalPlayer.CharacterAdded:Connect(function(ch)
+    currentCharacter = ch
+    -- Wait for root part but don't block too long
+    currentRoot = ch:WaitForChild("HumanoidRootPart", 5)
+    currentHumanoid = ch:FindFirstChildWhichIsA("Humanoid")
+    -- mark that character changed so any in-progress attempts will abort
+    characterChanged = true
+    task.wait(0.2)
+    characterChanged = false
+end)
+
+-- Safe teleport that avoids toggling PlatformStand (which can cause resets)
+local function safeTeleportTo(pos)
+    if not currentCharacter or not currentRoot then return false end
+    pcall(function()
+        -- Avoid toggling PlatformStand. Instead, try to zero velocity and set CFrame quickly.
+        if currentRoot and currentRoot:IsA("BasePart") then
+            pcall(function() currentRoot.Velocity = Vector3.new(0,0,0) end)
+            currentRoot.CFrame = CFrame.new(pos)
+            task.wait(0.06)
+        end
+    end)
+    return true
+end
+
+-- Attempt to collect a part: prefer MoveTo (walk) first, then teleport as fallback.
+local function attemptCollectPart(part)
+    if not part or not part.Parent then return false end
+    if not currentCharacter or not currentRoot then return false end
+
+    -- save return location and a snapshot of the character to ensure we return the same one
+    local beforeCFrame = currentRoot and currentRoot.CFrame or nil
+    local savedCharacter = currentCharacter
+
+    -- 1) Try walking there first to avoid teleport detection
+    if MOVE_TO_FALLBACK and currentHumanoid and part.Position then
+        local ok = pcall(function()
+            currentHumanoid:MoveTo(part.Position + Vector3.new(0, 1, 0))
+        end)
+        if ok then
+            local movedStart = os.clock()
+            local reached = false
+            local movedConn
+            movedConn = currentHumanoid.MoveToFinished:Connect(function(reachedArg)
+                reached = reachedArg
+            end)
+            while os.clock() - movedStart < PER_EGG_TIMEOUT do
+                if isCollected(part) then
+                    if movedConn then movedConn:Disconnect() end
+                    if RETURN_AFTER_EACH and beforeCFrame and currentRoot and currentCharacter == savedCharacter then
+                        pcall(safeTeleportTo, beforeCFrame.p)
+                    end
+                    return true
+                end
+                if reached then break end
+                if characterChanged then break end
+                task.wait(0.12)
+            end
+            if movedConn then movedConn:Disconnect() end
+        end
+    end
+
+    -- 2) Teleport just above the part as a fallback
+    pcall(safeTeleportTo, part.Position + TELEPORT_OFFSET)
+    local start = os.clock()
+    while os.clock() - start < PER_EGG_TIMEOUT do
+        if isCollected(part) then
+            if RETURN_AFTER_EACH and beforeCFrame and currentRoot and currentCharacter == savedCharacter then
+                pcall(safeTeleportTo, beforeCFrame.p)
+            end
+            return true
+        end
+        if characterChanged then break end
+        task.wait(0.12)
+    end
+
+    -- 3) Teleport a bit higher and try again
+    pcall(safeTeleportTo, part.Position + Vector3.new(0, 6, 0))
+    start = os.clock()
+    while os.clock() - start < PER_EGG_TIMEOUT do
+        if isCollected(part) then
+            if RETURN_AFTER_EACH and beforeCFrame and currentRoot and currentCharacter == savedCharacter then
+                pcall(safeTeleportTo, beforeCFrame.p)
+            end
+            return true
+        end
+        if characterChanged then break end
+        task.wait(0.12)
+    end
+
+    -- Restore original position only if it's still the same character
+    if RETURN_AFTER_EACH and beforeCFrame and currentRoot and currentCharacter == savedCharacter then
+        pcall(safeTeleportTo, beforeCFrame.p)
+    end
+
+    return isCollected(part)
+end
