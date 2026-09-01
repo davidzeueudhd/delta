@@ -1,0 +1,100 @@
+--[[
+    SPEED TOGGLE - FIXED
+    - Keybind: B (or N if B doesn't work)
+    - Speed: 60
+    - Status: Console + Character glow
+]]
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+
+local speedActive = false
+local normalSpeed = 16
+local boostSpeed = 60
+local glowObject = nil
+
+-- ==============================
+-- GLOW INDICATOR (visible feedback)
+-- ==============================
+local function addGlow()
+    if glowObject then return end
+    local glow = Instance.new("Highlight")
+    glow.Parent = character
+    glow.FillColor = Color3.fromRGB(0, 255, 255)
+    glow.FillTransparency = 0.3
+    glow.OutlineColor = Color3.fromRGB(0, 255, 255)
+    glow.OutlineTransparency = 0.5
+    glowObject = glow
+end
+
+local function removeGlow()
+    if glowObject then
+        glowObject:Destroy()
+        glowObject = nil
+    end
+end
+
+-- ==============================
+-- TOGGLE SPEED
+-- ==============================
+local function toggleSpeed()
+    speedActive = not speedActive
+    
+    if speedActive then
+        humanoid.WalkSpeed = boostSpeed
+        addGlow()
+        print("🟢 Speed ON (60) - Glow active!")
+    else
+        humanoid.WalkSpeed = normalSpeed
+        removeGlow()
+        print("🔴 Speed OFF (16) - Glow removed")
+    end
+end
+
+-- ==============================
+-- KEYBIND: B (main) + N (backup)
+-- ==============================
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.B then
+        toggleSpeed()
+    end
+    
+    if input.KeyCode == Enum.KeyCode.N then
+        toggleSpeed()
+    end
+end)
+
+-- ==============================
+-- FORCE SPEED (prevents game resetting it)
+-- ==============================
+RunService.Heartbeat:Connect(function()
+    if speedActive and humanoid then
+        humanoid.WalkSpeed = boostSpeed
+    end
+end)
+
+-- ==============================
+-- CHARACTER RESET
+-- ==============================
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    humanoid = character:WaitForChild("Humanoid")
+    if speedActive then
+        humanoid.WalkSpeed = boostSpeed
+        addGlow()
+    else
+        humanoid.WalkSpeed = normalSpeed
+        removeGlow()
+    end
+end)
+
+print("🔥 SPEED TOGGLE FIXED GELADEN!")
+print("📌 Drücke B ODER N = Speed 60 AN/AUS")
+print("📌 Charakter leuchtet CYAN wenn Speed ON")
