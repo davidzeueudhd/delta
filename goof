@@ -1,1 +1,141 @@
+--[[
+    TELEPORTATION GUI - FIXED VISIBILITY
+    - Debug: prints if GUI is created
+    - Guaranteed visibility
+]]
 
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local player = Players.LocalPlayer
+
+local teleportEnabled = false
+local gui = nil
+local frame = nil
+
+print("🔍 GUI wird erstellt...")
+
+-- ==============================
+-- CREATE GUI (VISIBLE!)
+-- ==============================
+local function createGUI()
+    gui = Instance.new("ScreenGui")
+    gui.Name = "TeleportGUI"
+    gui.Parent = player:WaitForChild("PlayerGui")
+    gui.IgnoreGuiInset = true
+    gui.ResetOnSpawn = false
+    
+    print("✅ GUI Parent: " .. tostring(gui.Parent))
+    print("✅ GUI Name: " .. gui.Name)
+
+    -- Main Frame - SUPER VISIBLE
+    frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 250, 0, 100)
+    frame.Position = UDim2.new(0.5, -125, 0.5, -50)
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 60)  -- Dark blue
+    frame.BackgroundTransparency = 0  -- FULLY VISIBLE
+    frame.BorderSizePixel = 4
+    frame.BorderColor3 = Color3.fromRGB(255, 255, 0)  -- Yellow border
+    frame.Active = true
+    frame.Draggable = true
+    frame.Visible = true  -- FORCE VISIBLE
+    frame.Parent = gui
+    
+    print("✅ Frame erstellt: " .. tostring(frame.Size))
+
+    -- Title
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 35)
+    title.BackgroundTransparency = 1
+    title.Text = "📍 TELEPORT"
+    title.TextColor3 = Color3.fromRGB(255, 255, 0)  -- Yellow
+    title.TextScaled = true
+    title.Font = Enum.Font.Bold
+    title.Visible = true
+    title.Parent = frame
+
+    -- ON/OFF Button
+    local toggleBtn = Instance.new("TextButton")
+    toggleBtn.Size = UDim2.new(0.6, 0, 0, 45)
+    toggleBtn.Position = UDim2.new(0.2, 0, 0, 45)
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    toggleBtn.Text = "🔴 OFF"
+    toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggleBtn.TextScaled = true
+    toggleBtn.Font = Enum.Font.SourceSansBold
+    toggleBtn.Visible = true
+    toggleBtn.Parent = frame
+    
+    print("✅ Button erstellt: " .. toggleBtn.Text)
+
+    -- Toggle function
+    toggleBtn.MouseButton1Click:Connect(function()
+        teleportEnabled = not teleportEnabled
+        if teleportEnabled then
+            toggleBtn.Text = "🟢 ON"
+            toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+            print("🟢 Teleport ON")
+        else
+            toggleBtn.Text = "🔴 OFF"
+            toggleBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+            print("🔴 Teleport OFF")
+        end
+    end)
+
+    print("✅ GUI fertig erstellt!")
+    return toggleBtn
+end
+
+-- ==============================
+-- TELEPORT ON CLICK
+-- ==============================
+local function setupTeleport()
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if not teleportEnabled then return end
+        
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local mouse = player:GetMouse()
+            if not mouse then return end
+            
+            local character = player.Character
+            if not character then return end
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
+            if not rootPart then return end
+            
+            local targetPos = mouse.Hit.Position
+            if not targetPos then return end
+            
+            -- Prevent GUI clicks from teleporting
+            local mouseTarget = mouse.Target
+            if mouseTarget and mouseTarget:IsDescendantOf(gui) then
+                return
+            end
+            
+            -- Teleport
+            rootPart.CFrame = CFrame.new(targetPos)
+            print("📍 Teleported to: " .. tostring(targetPos))
+            
+            -- Visual flash
+            local flash = Instance.new("Part")
+            flash.Size = Vector3.new(5, 1, 5)
+            flash.Position = targetPos
+            flash.Anchored = true
+            flash.CanCollide = false
+            flash.BrickColor = BrickColor.new("Bright green")
+            flash.Material = Enum.Material.Neon
+            flash.Transparency = 0.3
+            flash.Parent = game:GetService("Workspace")
+            game:GetService("Debris"):AddItem(flash, 0.5)
+        end
+    end)
+end
+
+-- ==============================
+-- CREATE GUI AND SETUP
+-- ==============================
+createGUI()
+setupTeleport()
+
+print("📍 TELEPORT GUI GELADEN!")
+print("📌 GUI sollte sichtbar sein!")
+print("📌 Klicke auf ON zum Aktivieren")
