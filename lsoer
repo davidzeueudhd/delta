@@ -1,0 +1,247 @@
+loadstring([[
+-- ============================================================
+--  GODMODE + EGG PROTECTION
+--  Verhindert, dass du stirbst und dein Ei verlierst
+-- ============================================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- ============================================================
+--  SETTINGS
+-- ============================================================
+local Settings = {
+    Godmode = true,      -- Unsterblich
+    EggProtection = true -- Behält dein Ei bei Angriff
+}
+
+-- ============================================================
+--  GODMODE (Unsterblichkeit)
+-- ============================================================
+local function Godmode()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local humanoid = char:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
+    -- Setze Gesundheit auf unendlich
+    humanoid.MaxHealth = math.huge
+    humanoid.Health = math.huge
+    
+    -- Verhindere Schaden
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+    
+    print("🛡️ Godmode AKTIV")
+end
+
+-- ============================================================
+--  EGG PROTECTION (Behält Ei bei Angriff)
+-- ============================================================
+local function ProtectEgg()
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    -- Suche nach dem Ei im Charakter
+    local egg = nil
+    for _, child in ipairs(char:GetChildren()) do
+        if child:IsA("Tool") and child.Name:lower():find("egg") then
+            egg = child
+            break
+        end
+    end
+    
+    if egg then
+        -- Verhindere, dass das Ei entfernt wird
+        local connection
+        connection = egg.AncestryChanged:Connect(function()
+            if egg and egg.Parent == nil then
+                -- Ei wurde entfernt → zurück in den Charakter
+                egg.Parent = char
+                print("🥚 Ei gerettet!")
+            end
+        end)
+        
+        -- Speichere die Verbindung für später
+        if not egg._protection then
+            egg._protection = connection
+        end
+    end
+end
+
+-- ============================================================
+--  ÜBERWACHUNG (läuft permanent)
+-- ============================================================
+RunService.Heartbeat:Connect(function()
+    -- Godmode
+    if Settings.Godmode then
+        local char = LocalPlayer.Character
+        if char then
+            local humanoid = char:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid.MaxHealth = math.huge
+                humanoid.Health = math.huge
+            end
+        end
+    end
+    
+    -- Egg Protection
+    if Settings.EggProtection then
+        ProtectEgg()
+    end
+end)
+
+-- ============================================================
+--  BEI CHARAKTER NEUERSCHEINUNG
+-- ============================================================
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(0.5)
+    Godmode()
+end)
+
+-- ============================================================
+--  GUI
+-- ============================================================
+local function CreateGUI()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "GodmodeGUI"
+    screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 250, 0, 160)
+    frame.Position = UDim2.new(0.5, -125, 0.5, -80)
+    frame.BackgroundColor3 = Color3.fromRGB(20, 22, 30)
+    frame.BackgroundTransparency = 0.1
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.Draggable = true
+    frame.Parent = screenGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = frame
+
+    -- Titel
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.BackgroundColor3 = Color3.fromRGB(255, 180, 50)
+    title.BackgroundTransparency = 0.3
+    title.Text = "🛡️ GODMODE + EGG PROTECT"
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.TextScaled = true
+    title.Font = Enum.Font.GothamBold
+    title.Parent = frame
+
+    -- Godmode Toggle
+    local gmLabel = Instance.new("TextLabel")
+    gmLabel.Size = UDim2.new(0.5, 0, 0, 30)
+    gmLabel.Position = UDim2.new(0.05, 0, 0, 50)
+    gmLabel.BackgroundTransparency = 1
+    gmLabel.Text = "🛡️ Godmode:"
+    gmLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    gmLabel.TextScaled = true
+    gmLabel.Font = Enum.Font.GothamMedium
+    gmLabel.TextXAlignment = Enum.TextXAlignment.Left
+    gmLabel.Parent = frame
+
+    local gmBtn = Instance.new("TextButton")
+    gmBtn.Size = UDim2.new(0.2, 0, 0, 26)
+    gmBtn.Position = UDim2.new(0.6, 0, 0, 51)
+    gmBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    gmBtn.Text = "ON"
+    gmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    gmBtn.TextScaled = true
+    gmBtn.Font = Enum.Font.GothamBold
+    gmBtn.BorderSizePixel = 0
+    gmBtn.Parent = frame
+
+    local gmCorner = Instance.new("UICorner")
+    gmCorner.CornerRadius = UDim.new(0, 6)
+    gmCorner.Parent = gmBtn
+
+    -- Egg Protection Toggle
+    local epLabel = Instance.new("TextLabel")
+    epLabel.Size = UDim2.new(0.5, 0, 0, 30)
+    epLabel.Position = UDim2.new(0.05, 0, 0, 85)
+    epLabel.BackgroundTransparency = 1
+    epLabel.Text = "🥚 Egg Protect:"
+    epLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    epLabel.TextScaled = true
+    epLabel.Font = Enum.Font.GothamMedium
+    epLabel.TextXAlignment = Enum.TextXAlignment.Left
+    epLabel.Parent = frame
+
+    local epBtn = Instance.new("TextButton")
+    epBtn.Size = UDim2.new(0.2, 0, 0, 26)
+    epBtn.Position = UDim2.new(0.6, 0, 0, 86)
+    epBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    epBtn.Text = "ON"
+    epBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    epBtn.TextScaled = true
+    epBtn.Font = Enum.Font.GothamBold
+    epBtn.BorderSizePixel = 0
+    epBtn.Parent = frame
+
+    local epCorner = Instance.new("UICorner")
+    epCorner.CornerRadius = UDim.new(0, 6)
+    epCorner.Parent = epBtn
+
+    -- Close Button
+    local close = Instance.new("TextButton")
+    close.Size = UDim2.new(0, 25, 0, 25)
+    close.Position = UDim2.new(1, -35, 0, 8)
+    close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    close.Text = "✕"
+    close.TextColor3 = Color3.fromRGB(255, 255, 255)
+    close.TextScaled = true
+    close.Font = Enum.Font.GothamBold
+    close.BorderSizePixel = 0
+    close.Parent = frame
+
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 8)
+    closeCorner.Parent = close
+
+    close.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
+        print("❌ GUI closed")
+    end)
+
+    -- Toggle Godmode
+    gmBtn.MouseButton1Click:Connect(function()
+        Settings.Godmode = not Settings.Godmode
+        gmBtn.BackgroundColor3 = Settings.Godmode and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+        gmBtn.Text = Settings.Godmode and "ON" or "OFF"
+        if Settings.Godmode then
+            Godmode()
+        end
+    end)
+
+    -- Toggle Egg Protection
+    epBtn.MouseButton1Click:Connect(function()
+        Settings.EggProtection = not Settings.EggProtection
+        epBtn.BackgroundColor3 = Settings.EggProtection and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+        epBtn.Text = Settings.EggProtection and "ON" or "OFF"
+    end)
+
+    -- Toggle GUI with R
+    game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == Enum.KeyCode.R then
+            frame.Visible = not frame.Visible
+        end
+    end)
+
+    print("✅ GUI loaded! Press R to toggle.")
+end
+
+-- ============================================================
+--  START
+-- ============================================================
+task.wait(0.5)
+CreateGUI()
+Godmode()
+print("🛡️ GODMODE + EGG PROTECTION loaded!")
+print("📌 R = toggle GUI")
+]])()
